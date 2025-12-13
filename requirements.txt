@@ -6,3 +6,4 @@ python-dotenv==1.0.0
 fpdf2==2.7.4
 Pillow==10.4.0
 reportlab==4.0.7
+openai==1.12.0
