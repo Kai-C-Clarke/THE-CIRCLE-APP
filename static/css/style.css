@@ -1418,7 +1418,109 @@ footer p {
     opacity: 0;
     transition: opacity 0.3s;
 }
+/* Media editing styles */
+.editable-title, .editable-description {
+    position: relative;
+    margin-bottom: 8px;
+}
 
+.editable-title h4 {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    margin: 0;
+}
+
+.editable-title h4:hover {
+    background-color: #f0f0f0;
+}
+
+.editable-description p {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    margin: 0 0 8px 0;
+    min-height: 20px;
+}
+
+.editable-description p:hover {
+    background-color: #f0f0f0;
+}
+
+.title-edit, .description-edit {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #4a90e2;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.title-edit:focus, .description-edit:focus {
+    outline: none;
+    border-color: #357ae8;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+.description-edit {
+    min-height: 60px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.save-title-btn, .cancel-title-btn,
+.save-description-btn, .cancel-description-btn {
+    background: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-right: 4px;
+    transition: background-color 0.2s;
+}
+
+.save-title-btn:hover, .save-description-btn:hover {
+    background: #357ae8;
+}
+
+.cancel-title-btn, .cancel-description-btn {
+    background: #6c757d;
+}
+
+.cancel-title-btn:hover, .cancel-description-btn:hover {
+    background: #5a6268;
+}
+
+.media-edit {
+    background: rgba(255, 193, 7, 0.9);
+    color: #212529;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    margin: 0 4px;
+}
+
+.media-edit:hover {
+    background: rgba(255, 193, 7, 1);
+    transform: scale(1.1);
+}
+
+.media-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
 .media-thumbnail:hover .media-overlay {
     opacity: 1;
 }

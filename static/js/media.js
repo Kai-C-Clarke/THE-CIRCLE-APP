@@ -1,4 +1,4 @@
-// media.js - Handle media upload and gallery
+// media.js - Handle media upload and gallery (FIXED VERSION - WORKING)
 
 class MediaManager {
     constructor() {
@@ -11,6 +11,11 @@ class MediaManager {
         
         this.selectedFiles = [];
         this.uploadInProgress = false;
+        this.isGalleryLoading = false;
+        this.galleryLoadTimeout = null;
+        
+        // NEW: Track uploads to prevent duplicates
+        this.activeUploads = new Set();
         
         this.initializeEventListeners();
         this.loadMediaGallery();
@@ -20,8 +25,12 @@ class MediaManager {
     }
     
     initializeEventListeners() {
-        // File input change
+        // File input change - FIXED: Clone to prevent duplicate listeners
         if (this.fileInput) {
+            const newInput = this.fileInput.cloneNode(true);
+            this.fileInput.parentNode.replaceChild(newInput, this.fileInput);
+            this.fileInput = newInput;
+            
             this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         }
         
@@ -48,10 +57,19 @@ class MediaManager {
             });
         }
         
-        // Upload form submit
+        // Upload form submit - FIXED: Clone to prevent duplicate listeners
         if (this.uploadForm) {
+            const newForm = this.uploadForm.cloneNode(true);
+            this.uploadForm.parentNode.replaceChild(newForm, this.uploadForm);
+            this.uploadForm = newForm;
+            
             this.uploadForm.addEventListener('submit', (e) => this.handleUpload(e));
         }
+    }
+    
+    // NEW: Get unique file identifier
+    getFileIdentifier(file) {
+        return `${file.name}-${file.size}-${file.lastModified}`;
     }
     
     handleFileSelect(event) {
@@ -70,13 +88,12 @@ class MediaManager {
             return;
         }
         
-        // Check file sizes (max 50MB per file)
-        const maxSize = 50 * 1024 * 1024; // 50MB
+        // Check file sizes
+        const maxSize = 50 * 1024 * 1024;
         const oversizedFiles = validFiles.filter(file => file.size > maxSize);
         
         if (oversizedFiles.length > 0) {
             this.showMessage(`Some files exceed 50MB limit: ${oversizedFiles.map(f => f.name).join(', ')}`, 'error');
-            // Remove oversized files
             this.selectedFiles = validFiles.filter(file => file.size <= maxSize);
         } else {
             this.selectedFiles = validFiles;
@@ -86,7 +103,6 @@ class MediaManager {
             this.showPreview();
         }
         
-        // Clear file input so same file can be selected again
         if (this.fileInput) {
             this.fileInput.value = '';
         }
@@ -97,9 +113,8 @@ class MediaManager {
         
         if (this.selectedFiles.length === 0) {
             this.previewContainer.innerHTML = '';
-            const mediaForm = document.getElementById('media-form-fields');
-            if (mediaForm) {
-                mediaForm.style.display = 'none';
+            if (this.uploadForm) {
+                this.uploadForm.style.display = 'none';
             }
             return;
         }
@@ -119,7 +134,7 @@ class MediaManager {
                 const url = URL.createObjectURL(file);
                 previewHTML = `
                     <div class="preview-image">
-                        <img src="${url}" alt="${file.name}">
+                        <img src="${url}" alt="${file.name}" loading="lazy">
                         <button type="button" class="remove-file" data-index="${index}">×</button>
                     </div>
                     <div class="preview-info">
@@ -128,7 +143,7 @@ class MediaManager {
                         <div class="file-type">Image</div>
                     </div>
                 `;
-                // Clean up object URL when done
+                // Clean up object URL when element is removed
                 previewDiv.addEventListener('remove', () => URL.revokeObjectURL(url));
             } else if (file.type.startsWith('audio/')) {
                 fileType = 'audio';
@@ -187,7 +202,6 @@ class MediaManager {
             previewDiv.innerHTML = previewHTML;
             this.previewContainer.appendChild(previewDiv);
             
-            // Add remove button functionality
             const removeBtn = previewDiv.querySelector('.remove-file');
             if (removeBtn) {
                 removeBtn.addEventListener('click', (e) => {
@@ -198,15 +212,12 @@ class MediaManager {
             }
         });
         
-        // Show form if it's hidden
-        const mediaForm = document.getElementById('media-form-fields');
-        if (mediaForm) {
-            mediaForm.style.display = 'block';
+        if (this.uploadForm) {
+            this.uploadForm.style.display = 'block';
         }
     }
     
     removeFile(index) {
-        // Revoke object URL if it's an image
         const previewItem = this.previewContainer.querySelector(`[data-index="${index}"]`);
         if (previewItem && previewItem.classList.contains('image')) {
             const img = previewItem.querySelector('img');
@@ -217,7 +228,6 @@ class MediaManager {
         
         this.selectedFiles.splice(index, 1);
         
-        // Update indices for remaining items
         const remainingItems = this.previewContainer.querySelectorAll('.media-preview-item');
         remainingItems.forEach((item, newIndex) => {
             item.dataset.index = newIndex;
@@ -231,6 +241,10 @@ class MediaManager {
     }
     
     formatFileSize(bytes) {
+        if (bytes === null || bytes === undefined || bytes === '') {
+            return 'Unknown size';
+        }
+        
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -246,14 +260,17 @@ class MediaManager {
             return;
         }
         
-        if (this.uploadInProgress) return;
+        if (this.uploadInProgress) {
+            console.log('Upload already in progress, skipping...');
+            return;
+        }
         
         this.uploadInProgress = true;
         const originalBtnText = this.uploadBtn.innerHTML;
         this.uploadBtn.disabled = true;
         this.uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
         
-        const title = document.getElementById('media-title')?.value || 'Untitled';
+        const title = document.getElementById('media-title')?.value || '';
         const description = document.getElementById('media-description')?.value || '';
         const memoryDate = document.getElementById('media-date')?.value || '';
         const year = document.getElementById('media-year')?.value || '';
@@ -263,39 +280,53 @@ class MediaManager {
         let errorCount = 0;
         const errors = [];
         
+        console.log(`Starting upload of ${this.selectedFiles.length} files`);
+        
+        // FIXED: Upload files sequentially and track duplicates
         for (const file of this.selectedFiles) {
+            const fileId = this.getFileIdentifier(file);
+            
+            // Skip if already uploading
+            if (this.activeUploads.has(fileId)) {
+                console.log(`Skipping duplicate file: ${file.name}`);
+                continue;
+            }
+            
+            this.activeUploads.add(fileId);
+            
             try {
                 const formData = new FormData();
-                formData.append('file', file);
-                formData.append('title', title);
+                formData.append('media', file);
+                formData.append('title', title || file.name);
                 formData.append('description', description);
                 formData.append('memory_date', memoryDate);
                 formData.append('year', year);
                 formData.append('people', people);
                 formData.append('original_filename', file.name);
                 formData.append('file_size', file.size);
-                formData.append('file_type', file.type);
                 
-                console.log('Uploading file:', file.name, file.type, file.size);
-                
+                console.log(`Uploading: ${file.name}`);
                 const response = await fetch('/api/media/upload', {
                     method: 'POST',
                     body: formData
                 });
                 
                 const result = await response.json();
-                console.log('Upload response:', result);
                 
                 if (response.ok && result.status === 'success') {
+                    console.log(`Success: ${file.name}`);
                     successCount++;
                 } else {
+                    console.error(`Failed: ${file.name} - ${result.message || 'Upload failed'}`);
                     errorCount++;
                     errors.push(`${file.name}: ${result.message || 'Upload failed'}`);
                 }
             } catch (error) {
+                console.error(`Error: ${file.name} - ${error.message}`);
                 errorCount++;
                 errors.push(`${file.name}: ${error.message}`);
-                console.error('Upload error:', error);
+            } finally {
+                this.activeUploads.delete(fileId);
             }
         }
         
@@ -303,24 +334,18 @@ class MediaManager {
         this.uploadBtn.disabled = false;
         this.uploadBtn.innerHTML = originalBtnText;
         
-        // Show result message
-        let message = '';
         if (successCount > 0) {
-            message = `Successfully uploaded ${successCount} file(s)`;
+            const message = `Successfully uploaded ${successCount} file(s)`;
+            console.log(message);
             this.selectedFiles = [];
             this.showPreview();
             
-            // Reload gallery after a short delay
-            setTimeout(() => this.loadMediaGallery(), 500);
+            // Use debounced gallery refresh
+            this.debouncedGalleryRefresh();
             
-            // Reset form
             if (this.uploadForm) {
                 this.uploadForm.reset();
-            }
-            
-            const mediaForm = document.getElementById('media-form-fields');
-            if (mediaForm) {
-                mediaForm.style.display = 'none';
+                this.uploadForm.style.display = 'none';
             }
             
             this.showMessage(message, 'success');
@@ -328,26 +353,57 @@ class MediaManager {
         
         if (errorCount > 0) {
             const errorMessage = `Failed to upload ${errorCount} file(s): ${errors.join('; ')}`;
+            console.error(errorMessage);
             this.showMessage(errorMessage, 'error');
         }
     }
     
+    // FIXED: Better debounced gallery refresh
+    debouncedGalleryRefresh() {
+        if (this.galleryLoadTimeout) {
+            clearTimeout(this.galleryLoadTimeout);
+        }
+        
+        // Don't queue if already loading
+        if (this.isGalleryLoading) {
+            console.log('Gallery loading, will refresh after current load');
+            this.galleryLoadTimeout = setTimeout(() => this.debouncedGalleryRefresh(), 1000);
+            return;
+        }
+        
+        this.galleryLoadTimeout = setTimeout(() => {
+            this.loadMediaGallery();
+            this.galleryLoadTimeout = null;
+        }, 1000);
+    }
+    
     async loadMediaGallery() {
+        // Prevent multiple simultaneous loads
+        if (this.isGalleryLoading) {
+            console.log('Gallery already loading, skipping...');
+            return;
+        }
+        
         console.log('Loading media gallery...');
+        
         if (!this.mediaGallery) {
             console.error('mediaGallery element not found!');
             return;
         }
         
-        // Show loading state
-        this.mediaGallery.innerHTML = `
-            <div class="loading-gallery">
-                <i class="fas fa-spinner fa-spin"></i>
-                <p>Loading media...</p>
-            </div>
-        `;
+        this.isGalleryLoading = true;
         
         try {
+            // Only show loading if not already showing
+            if (!this.mediaGallery.querySelector('.loading-gallery')) {
+                this.mediaGallery.innerHTML = `
+                    <div class="loading-gallery">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading media...</p>
+                    </div>
+                `;
+            }
+            
             const response = await fetch('/api/media/all');
             
             if (!response.ok) {
@@ -355,8 +411,7 @@ class MediaManager {
             }
             
             const mediaItems = await response.json();
-            console.log('Received media items:', mediaItems);
-            
+            console.log(`Loaded ${mediaItems.length} media items`);
             this.renderMediaGallery(mediaItems);
         } catch (error) {
             console.error('Error loading media gallery:', error);
@@ -369,6 +424,8 @@ class MediaManager {
                     </button>
                 </div>
             `;
+        } finally {
+            this.isGalleryLoading = false;
         }
     }
     
@@ -402,15 +459,38 @@ class MediaManager {
                                 <button class="media-view" title="View full size">
                                     <i class="fas fa-expand"></i>
                                 </button>
+                                <button class="media-edit" data-id="${item.id}" title="Edit details">
+                                    <i class="fas fa-edit"></i>
+                                </button>
                                 <button class="media-delete" data-id="${item.id}" title="Delete">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
                         </div>
                         <div class="media-info">
-                            <h4>${item.title || item.original_filename}</h4>
-                            <p class="media-description">${item.description || 'No description'}</p>
-                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.uploaded_at).toLocaleDateString()}</small>
+                            <div class="editable-title">
+                                <h4 class="title-display">${item.title || item.original_filename}</h4>
+                                <input type="text" class="title-edit" value="${item.title || item.original_filename}" 
+                                       style="display: none;" data-original="${item.title || item.original_filename}">
+                                <button class="save-title-btn" data-id="${item.id}" style="display: none;">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="cancel-title-btn" style="display: none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="editable-description">
+                                <p class="description-display">${item.description || 'No description'}</p>
+                                <textarea class="description-edit" style="display: none;" 
+                                          placeholder="Add a description...">${item.description || ''}</textarea>
+                                <button class="save-description-btn" data-id="${item.id}" style="display: none;">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="cancel-description-btn" style="display: none;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.created_at).toLocaleDateString()}</small>
                         </div>
                     </div>
                 `;
@@ -433,7 +513,7 @@ class MediaManager {
                         <div class="media-info">
                             <h4>${item.title || item.original_filename}</h4>
                             <p class="media-description">${item.description || 'No description'}</p>
-                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.uploaded_at).toLocaleDateString()}</small>
+                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.created_at).toLocaleDateString()}</small>
                         </div>
                     </div>
                 `;
@@ -456,7 +536,7 @@ class MediaManager {
                         <div class="media-info">
                             <h4>${item.title || item.original_filename}</h4>
                             <p class="media-description">${item.description || 'No description'}</p>
-                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.uploaded_at).toLocaleDateString()}</small>
+                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.created_at).toLocaleDateString()}</small>
                         </div>
                     </div>
                 `;
@@ -479,7 +559,7 @@ class MediaManager {
                         <div class="media-info">
                             <h4>${item.title || item.original_filename}</h4>
                             <p class="media-description">${item.description || 'No description'}</p>
-                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.uploaded_at).toLocaleDateString()}</small>
+                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.created_at).toLocaleDateString()}</small>
                         </div>
                     </div>
                 `;
@@ -502,7 +582,7 @@ class MediaManager {
                         <div class="media-info">
                             <h4>${item.title || item.original_filename}</h4>
                             <p class="media-description">${item.description || 'No description'}</p>
-                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.uploaded_at).toLocaleDateString()}</small>
+                            <small>${this.formatFileSize(item.file_size)} • ${new Date(item.created_at).toLocaleDateString()}</small>
                         </div>
                     </div>
                 `;
@@ -514,7 +594,12 @@ class MediaManager {
         html += '</div>';
         this.mediaGallery.innerHTML = html;
         
-        // Add event listeners to delete buttons
+        // Add event listeners
+        this.attachGalleryEventListeners();
+    }
+    
+    attachGalleryEventListeners() {
+        // Delete buttons
         this.mediaGallery.querySelectorAll('.media-delete').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.preventDefault();
@@ -529,19 +614,7 @@ class MediaManager {
                         
                         if (response.ok) {
                             this.showMessage('Media deleted successfully', 'success');
-                            // Remove the item from DOM
-                            const mediaItem = btn.closest('.media-item');
-                            if (mediaItem) {
-                                mediaItem.style.opacity = '0.5';
-                                setTimeout(() => {
-                                    mediaItem.remove();
-                                    // Reload gallery if empty
-                                    const remainingItems = this.mediaGallery.querySelectorAll('.media-item');
-                                    if (remainingItems.length === 0) {
-                                        this.loadMediaGallery();
-                                    }
-                                }, 300);
-                            }
+                            this.debouncedGalleryRefresh();
                         } else {
                             const result = await response.json();
                             throw new Error(result.error || 'Delete failed');
@@ -554,41 +627,205 @@ class MediaManager {
             });
         });
         
-        // Add event listeners to view buttons
+        // View buttons for lightbox (images only)
         this.mediaGallery.querySelectorAll('.media-view').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                // For image items, open lightbox instead of new tab
-                if (btn.closest('.image')) {
+            if (btn.closest('.image')) {
+                btn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     const img = btn.closest('.media-thumbnail').querySelector('img');
                     if (img) {
                         this.openLightbox(img.src, img.alt);
                     }
-                }
-                // For non-link view buttons (audio/video with play button)
-                else if (btn.tagName === 'BUTTON') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const mediaItem = btn.closest('.media-item');
-                    const link = mediaItem.querySelector('a.media-view');
-                    if (link) {
-                        window.open(link.href, '_blank');
-                    }
-                }
+                });
+            }
+        });
+        
+        // Edit buttons
+        this.mediaGallery.querySelectorAll('.media-edit').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const mediaItem = btn.closest('.media-item');
+                this.enableEditing(mediaItem);
+            });
+        });
+
+        // Title editing (double-click)
+        this.mediaGallery.querySelectorAll('.title-display').forEach(titleDisplay => {
+            titleDisplay.addEventListener('dblclick', (e) => {
+                const mediaItem = e.target.closest('.media-item');
+                this.enableTitleEditing(mediaItem);
+            });
+        });
+
+        // Description editing (double-click)
+        this.mediaGallery.querySelectorAll('.description-display').forEach(descDisplay => {
+            descDisplay.addEventListener('dblclick', (e) => {
+                const mediaItem = e.target.closest('.media-item');
+                this.enableDescriptionEditing(mediaItem);
             });
         });
     }
     
+    // ============ EDITING METHODS ============
+    
+    enableEditing(mediaItem) {
+        this.enableTitleEditing(mediaItem);
+        this.enableDescriptionEditing(mediaItem);
+    }
+    
+    enableTitleEditing(mediaItem) {
+        const titleDisplay = mediaItem.querySelector('.title-display');
+        const titleEdit = mediaItem.querySelector('.title-edit');
+        const saveBtn = mediaItem.querySelector('.save-title-btn');
+        const cancelBtn = mediaItem.querySelector('.cancel-title-btn');
+        
+        if (titleDisplay && titleEdit) {
+            titleDisplay.style.display = 'none';
+            titleEdit.style.display = 'block';
+            saveBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'inline-block';
+            
+            titleEdit.focus();
+            titleEdit.select();
+            
+            // Save on Enter key
+            titleEdit.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    this.saveTitle(mediaItem);
+                } else if (e.key === 'Escape') {
+                    this.cancelTitleEditing(mediaItem);
+                }
+            });
+            
+            // Save button click
+            saveBtn.onclick = () => this.saveTitle(mediaItem);
+            
+            // Cancel button click
+            cancelBtn.onclick = () => this.cancelTitleEditing(mediaItem);
+        }
+    }
+    
+    enableDescriptionEditing(mediaItem) {
+        const descDisplay = mediaItem.querySelector('.description-display');
+        const descEdit = mediaItem.querySelector('.description-edit');
+        const saveBtn = mediaItem.querySelector('.save-description-btn');
+        const cancelBtn = mediaItem.querySelector('.cancel-description-btn');
+        
+        if (descDisplay && descEdit) {
+            descDisplay.style.display = 'none';
+            descEdit.style.display = 'block';
+            saveBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'inline-block';
+            
+            descEdit.focus();
+            
+            // Save button click
+            saveBtn.onclick = () => this.saveDescription(mediaItem);
+            
+            // Cancel button click
+            cancelBtn.onclick = () => this.cancelDescriptionEditing(mediaItem);
+        }
+    }
+    
+    cancelTitleEditing(mediaItem) {
+        const titleDisplay = mediaItem.querySelector('.title-display');
+        const titleEdit = mediaItem.querySelector('.title-edit');
+        const saveBtn = mediaItem.querySelector('.save-title-btn');
+        const cancelBtn = mediaItem.querySelector('.cancel-title-btn');
+        
+        const originalValue = titleEdit.dataset.original;
+        titleEdit.value = originalValue;
+        
+        titleDisplay.style.display = 'block';
+        titleEdit.style.display = 'none';
+        saveBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+    }
+    
+    cancelDescriptionEditing(mediaItem) {
+        const descDisplay = mediaItem.querySelector('.description-display');
+        const descEdit = mediaItem.querySelector('.description-edit');
+        const saveBtn = mediaItem.querySelector('.save-description-btn');
+        const cancelBtn = mediaItem.querySelector('.cancel-description-btn');
+        
+        descDisplay.style.display = 'block';
+        descEdit.style.display = 'none';
+        saveBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+    }
+    
+    async saveTitle(mediaItem) {
+        const mediaId = mediaItem.dataset.id;
+        const titleEdit = mediaItem.querySelector('.title-edit');
+        const newTitle = titleEdit.value.trim();
+        
+        if (!newTitle) {
+            this.showMessage('Title cannot be empty', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/media/${mediaId}/update`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle })
+            });
+            
+            if (response.ok) {
+                const titleDisplay = mediaItem.querySelector('.title-display');
+                titleDisplay.textContent = newTitle;
+                titleEdit.dataset.original = newTitle;
+                
+                this.cancelTitleEditing(mediaItem);
+                this.showMessage('Title updated successfully', 'success');
+            } else {
+                const result = await response.json();
+                throw new Error(result.message || 'Update failed');
+            }
+        } catch (error) {
+            console.error('Update error:', error);
+            this.showMessage('Failed to update title: ' + error.message, 'error');
+            this.cancelTitleEditing(mediaItem);
+        }
+    }
+    
+    async saveDescription(mediaItem) {
+        const mediaId = mediaItem.dataset.id;
+        const descEdit = mediaItem.querySelector('.description-edit');
+        const newDescription = descEdit.value.trim();
+        
+        try {
+            const response = await fetch(`/api/media/${mediaId}/update`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: newDescription })
+            });
+            
+            if (response.ok) {
+                const descDisplay = mediaItem.querySelector('.description-display');
+                descDisplay.textContent = newDescription || 'No description';
+                
+                this.cancelDescriptionEditing(mediaItem);
+                this.showMessage('Description updated successfully', 'success');
+            } else {
+                const result = await response.json();
+                throw new Error(result.message || 'Update failed');
+            }
+        } catch (error) {
+            console.error('Update error:', error);
+            this.showMessage('Failed to update description: ' + error.message, 'error');
+            this.cancelDescriptionEditing(mediaItem);
+        }
+    }
+    
     initLightbox() {
-        // Create lightbox HTML if it doesn't exist
         if (!document.getElementById('lightbox')) {
             const lightboxHTML = `
-                <div id="lightbox" class="lightbox" style="display: none;">
+                <div id="lightbox" class="lightbox" style="display: none; opacity: 0;">
                     <div class="lightbox-content">
                         <button class="lightbox-close">&times;</button>
-                        <button class="lightbox-prev">&lt;</button>
-                        <button class="lightbox-next">&gt;</button>
                         <img src="" alt="" class="lightbox-image">
                         <div class="lightbox-caption"></div>
                     </div>
@@ -596,23 +833,17 @@ class MediaManager {
             `;
             document.body.insertAdjacentHTML('beforeend', lightboxHTML);
             
-            // Add lightbox event listeners
             const lightbox = document.getElementById('lightbox');
             const closeBtn = lightbox.querySelector('.lightbox-close');
-            const prevBtn = lightbox.querySelector('.lightbox-prev');
-            const nextBtn = lightbox.querySelector('.lightbox-next');
             
             closeBtn.addEventListener('click', () => this.closeLightbox());
             lightbox.addEventListener('click', (e) => {
                 if (e.target === lightbox) this.closeLightbox();
             });
             
-            // Add keyboard navigation
             document.addEventListener('keydown', (e) => {
-                if (lightbox.style.display === 'flex') {
-                    if (e.key === 'Escape') this.closeLightbox();
-                    if (e.key === 'ArrowLeft') prevBtn.click();
-                    if (e.key === 'ArrowRight') nextBtn.click();
+                if (lightbox.style.display === 'flex' && e.key === 'Escape') {
+                    this.closeLightbox();
                 }
             });
         }
@@ -628,12 +859,11 @@ class MediaManager {
         lightboxCaption.textContent = caption;
         
         lightbox.style.display = 'flex';
-        document.body.style.overflow = 'hidden'; // Prevent scrolling
-        
-        // Fade in animation
         setTimeout(() => {
             lightbox.style.opacity = '1';
         }, 10);
+        
+        document.body.style.overflow = 'hidden';
     }
     
     closeLightbox() {
@@ -642,12 +872,11 @@ class MediaManager {
         
         setTimeout(() => {
             lightbox.style.display = 'none';
-            document.body.style.overflow = 'auto'; // Restore scrolling
+            document.body.style.overflow = 'auto';
         }, 300);
     }
     
     showMessage(message, type) {
-        // Remove existing messages
         const existingMsg = document.querySelector('.media-message');
         if (existingMsg) {
             existingMsg.remove();
@@ -661,18 +890,16 @@ class MediaManager {
             <button class="close-message">&times;</button>
         `;
         
-        const container = document.querySelector('.media-container') || document.querySelector('.media-tab') || document.body;
+        const container = document.querySelector('.media-container') || document.querySelector('#mediaTab') || document.body;
         if (container) {
             container.prepend(messageDiv);
             
-            // Auto-remove after 5 seconds
             setTimeout(() => {
                 if (messageDiv.parentNode) {
                     messageDiv.remove();
                 }
             }, 5000);
             
-            // Close button
             messageDiv.querySelector('.close-message').addEventListener('click', () => {
                 messageDiv.remove();
             });
@@ -680,32 +907,24 @@ class MediaManager {
     }
 }
 
-// Initialize when DOM is loaded
+// FIXED: Initialize only once
+let mediaManagerInitialized = false;
 document.addEventListener('DOMContentLoaded', () => {
-    window.mediaManager = new MediaManager();
+    if (!mediaManagerInitialized) {
+        window.mediaManager = new MediaManager();
+        mediaManagerInitialized = true;
+    }
 });
 
-// Add tab change listener
+// FIXED: Better tab change handling
+let lastTabChangeTime = 0;
 document.addEventListener('tabChanged', (e) => {
     if (e.detail.tab === 'media' && window.mediaManager) {
-        setTimeout(() => window.mediaManager.loadMediaGallery(), 100);
+        const now = Date.now();
+        // Prevent rapid successive calls (within 2 seconds)
+        if (now - lastTabChangeTime > 2000) {
+            window.mediaManager.debouncedGalleryRefresh();
+            lastTabChangeTime = now;
+        }
     }
 });
-
-// Helper for tab changes
-const originalShowTab = window.showTab;
-window.showTab = function(tabName, event) {
-    if (originalShowTab) {
-        originalShowTab(tabName, event);
-    }
-    
-    // Dispatch custom event for tab change
-    document.dispatchEvent(new CustomEvent('tabChanged', { 
-        detail: { tab: tabName } 
-    }));
-    
-    // Load media gallery when media tab is shown
-    if (tabName === 'media' && window.mediaManager) {
-        setTimeout(() => window.mediaManager.loadMediaGallery(), 100);
-    }
-};
