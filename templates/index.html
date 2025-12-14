@@ -32,17 +32,36 @@
             </div>
             
             <div class="form-group">
-                <label for="family-role"><i class="fas fa-users"></i> Your Family Role *</label>
-                <select id="family-role">
-                    <option value="">Select your role</option>
-                    <option value="parent">Parent</option>
-                    <option value="grandparent">Grandparent</option>
-                    <option value="child">Child</option>
-                    <option value="sibling">Sibling</option>
-                    <option value="cousin">Cousin</option>
-                    <option value="spouse">Spouse</option>
-                    <option value="other">Other</option>
-                </select>
+                <label><i class="fas fa-users"></i> Your Family Roles * <small class="hint" style="font-weight: normal;">(Select all that apply)</small></label>
+                <div class="checkbox-group" id="family-roles">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="parent"> Parent
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="grandparent"> Grandparent
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="child"> Child
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="sibling"> Sibling
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="cousin"> Cousin
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="spouse"> Spouse
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="aunt-uncle"> Aunt/Uncle
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="niece-nephew"> Niece/Nephew
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="family-role" value="other"> Other
+                    </label>
+                </div>
             </div>
             
             <div class="form-group">
@@ -345,8 +364,84 @@
     
     <!-- Declare global functions -->
     <script>
+        // Override saveProfile to handle multiple checkboxes
+        const originalSaveProfile = window.saveProfile;
+        window.saveProfile = async function() {
+            try {
+                const name = document.getElementById('user-name').value.trim();
+                const birthDate = document.getElementById('birth-date').value;
+                const birthPlace = document.getElementById('birth-place').value.trim();
+                
+                // Get all checked family roles
+                const roleCheckboxes = document.querySelectorAll('input[name="family-role"]:checked');
+                const roles = Array.from(roleCheckboxes).map(cb => cb.value);
+                
+                // Validation
+                if (!name) {
+                    alert('Please enter your name');
+                    return;
+                }
+                
+                if (!birthDate) {
+                    alert('Please enter your birth date');
+                    return;
+                }
+                
+                if (roles.length === 0) {
+                    alert('Please select at least one family role');
+                    return;
+                }
+                
+                // Join roles with comma for storage
+                const familyRole = roles.join(', ');
+                
+                const response = await fetch('/api/profile/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        birth_date: birthDate,
+                        family_role: familyRole,
+                        birth_place: birthPlace
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Hide setup, show main interface
+                    document.getElementById('profile-setup').style.display = 'none';
+                    document.querySelector('.tab-container').style.display = 'flex';
+                    
+                    // Store profile
+                    window.userProfile = {
+                        name: name,
+                        birth_date: birthDate,
+                        family_role: familyRole,
+                        birth_place: birthPlace
+                    };
+                    
+                    // Show welcome message
+                    alert(`Welcome to The Circle, ${name}!`);
+                    
+                    // Load initial content
+                    if (typeof loadMemories === 'function') {
+                        loadMemories();
+                    }
+                } else {
+                    alert('Error saving profile: ' + data.message);
+                }
+                
+            } catch (error) {
+                console.error('Error saving profile:', error);
+                alert('Error saving profile. Please try again.');
+            }
+        };
+        
         // Make functions available globally
-        window.saveProfile = saveProfile; //window.showTab = showTab; removed.
+        //window.saveProfile = saveProfile; // Already defined above
         window.performSmartSearch = performSmartSearch;
         window.loadMemories = loadMemories;
         window.addComment = addComment;

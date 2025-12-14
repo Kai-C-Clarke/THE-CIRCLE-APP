@@ -107,6 +107,51 @@ header h1 {
     box-shadow: 0 0 0 3px rgba(74, 111, 165, 0.1);
 }
 
+/* Checkbox Group for Family Roles */
+.checkbox-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #f8f9fa;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 500;
+    color: #333;
+}
+
+.checkbox-label:hover {
+    background: #e9ecef;
+    border-color: #4a6fa5;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #4a6fa5;
+}
+
+.checkbox-label input[type="checkbox"]:checked + * {
+    font-weight: 600;
+}
+
+.checkbox-label:has(input:checked) {
+    background: #e8f0ff;
+    border-color: #4a6fa5;
+    color: #4a6fa5;
+}
+
+
 .hint {
     display: block;
     margin-top: 6px;
@@ -1738,6 +1783,11 @@ footer p {
     
     .export-options {
         flex-direction: column;
+    }
+    
+    /* Checkbox group responsive */
+    .checkbox-group {
+        grid-template-columns: 1fr;
     }
 }
 
