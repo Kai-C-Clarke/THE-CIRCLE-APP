@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # Import our modules
-from database import init_db, get_db
+from database import init_db, get_db, migrate_db
 from search_engine import EnhancedSearch
 from ai_search import ai_searcher  # NEW: Import AI search
 from utils import allowed_file, parse_date_input, categorize_memory
@@ -24,8 +24,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 
-# Initialize database on startup
 init_db()
+migrate_db()
 
 # Add to app.py after init_db()
 def scan_existing_uploads():

@@ -93,3 +93,22 @@ def init_db():
     conn.commit()
     conn.close()
     print(f"Database initialized at: {DB_PATH}")
+
+def migrate_db():
+    """Add file_size column if it doesn't exist."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check if file_size column exists
+        cursor.execute("PRAGMA table_info(media)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        if 'file_size' not in columns:
+            cursor.execute("ALTER TABLE media ADD COLUMN file_size INTEGER")
+            conn.commit()
+            print("✓ Added file_size column to media table")
+        
+        conn.close()
+    except Exception as e:
+        print(f"Migration error: {e}")
