@@ -1,1 +1,5 @@
 .DS_Store
+
+static/
+
+__pycache__/database.cpython-313.pyc

@@ -1632,3 +1632,200 @@ footer p {
     font-size: 16px;
     margin: 10px 0;
 }
+
+/* ============================================
+   RESPONSIVE DESIGN - TABLETS & MOBILE
+   ============================================ */
+
+/* Tablet (iPad) - Portrait and Landscape */
+@media screen and (max-width: 1024px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        max-width: 100%;
+        border-radius: 10px;
+    }
+    
+    header h1 {
+        font-size: 2em;
+    }
+    
+    .tagline {
+        font-size: 1em;
+    }
+    
+    .profile-setup {
+        padding: 30px 20px;
+    }
+    
+    .tab-content {
+        padding: 20px;
+    }
+    
+    .tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 0 10px;
+    }
+    
+    .tab {
+        padding: 14px 18px;
+        font-size: 14px;
+    }
+}
+
+/* Tablet - Portrait (iPad Portrait) */
+@media screen and (max-width: 768px) {
+    header {
+        padding: 20px;
+    }
+    
+    header h1 {
+        font-size: 1.75em;
+    }
+    
+    .profile-setup {
+        padding: 20px 15px;
+    }
+    
+    .setup-header h2 {
+        font-size: 1.5em;
+    }
+    
+    .welcome-text {
+        font-size: 1em;
+    }
+    
+    .tab-header h2 {
+        font-size: 1.5em;
+    }
+    
+    .tab-description {
+        font-size: 1em;
+    }
+    
+    .prompt-buttons {
+        flex-direction: column;
+    }
+    
+    .prompt-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .search-box {
+        flex-direction: column;
+    }
+    
+    .search-box input {
+        width: 100%;
+    }
+    
+    .btn-secondary {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .media-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+    
+    .export-options {
+        flex-direction: column;
+    }
+}
+
+/* Mobile Phones */
+@media screen and (max-width: 480px) {
+    body {
+        padding: 5px;
+    }
+    
+    header {
+        padding: 15px;
+    }
+    
+    header h1 {
+        font-size: 1.5em;
+    }
+    
+    .tagline {
+        font-size: 0.9em;
+    }
+    
+    .profile-setup {
+        padding: 15px 10px;
+    }
+    
+    .setup-header h2 {
+        font-size: 1.3em;
+    }
+    
+    .tab-content {
+        padding: 15px 10px;
+    }
+    
+    .tabs {
+        padding: 0 5px;
+    }
+    
+    .tab {
+        padding: 12px 12px;
+        font-size: 12px;
+        gap: 5px;
+    }
+    
+    .tab i {
+        font-size: 14px;
+    }
+    
+    .btn-primary {
+        min-width: auto;
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 14px;
+    }
+    
+    .btn-large {
+        padding: 16px 24px;
+        font-size: 16px;
+    }
+    
+    textarea {
+        padding: 15px;
+        font-size: 14px;
+    }
+    
+    .memory-card {
+        padding: 15px;
+    }
+    
+    .memory-text {
+        font-size: 1em;
+    }
+    
+    .media-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .media-preview {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+
+/* Ensure proper viewport behavior on iOS */
+@supports (-webkit-touch-callout: none) {
+    body {
+        -webkit-text-size-adjust: 100%;
+    }
+    
+    input, select, textarea {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+    }
+}
