@@ -38,12 +38,13 @@ def init_db():
         created_at TEXT
     )''')
     
-    # Media
+    # Media - FIXED: Added file_size column
     cursor.execute('''CREATE TABLE IF NOT EXISTS media (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         filename TEXT NOT NULL,
         original_filename TEXT,
         file_type TEXT,
+        file_size INTEGER,
         title TEXT,
         description TEXT,
         memory_date TEXT,
