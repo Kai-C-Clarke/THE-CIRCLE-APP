@@ -97,6 +97,11 @@ def health_check():
         "ai_search": ai_searcher.client is not None
     })
 
+@app.route('/goodbye')
+def goodbye():
+    """Exit/goodbye page with instructions on how to close the browser."""
+    return render_template('goodbye.html')
+
 # ============================================
 # PROFILE ROUTES
 # ============================================
@@ -147,62 +152,153 @@ def get_profile():
 
 @app.route('/api/memories/save', methods=['POST'])
 def save_memory():
+    """Save a new memory with optional audio recording."""
     try:
         data = request.json
         text = data.get('text', '').strip()
+        memory_date = data.get('memory_date', '').strip()
+        audio_filename = data.get('audio_filename', '').strip()  # Get audio file
         
         if not text:
-            return jsonify({"status": "error", "message": "No text provided"}), 400
+            return jsonify({"status": "error", "message": "Memory text is required"}), 400
         
-        memory_date, year = parse_date_input(data.get('date_input', ''))
-        if not memory_date:
-            # Try to extract from text
-            import re
-            year_match = re.search(r'\b(19|20)\d{2}\b', text)
-            if year_match:
-                year = int(year_match.group(0))
+        # Parse date - FIX: Unpack the tuple properly!
+        parsed_date = None
+        year = None
+        if memory_date:
+            date_result = parse_date_input(memory_date)
+            # parse_date_input returns (date_string, year) tuple
+            if date_result:
+                if isinstance(date_result, tuple):
+                    parsed_date, year = date_result  # Unpack the tuple!
+                else:
+                    parsed_date = date_result
+                    # Try to extract year if not provided
+                    try:
+                        import re
+                        year_match = re.search(r'\d{4}', parsed_date)
+                        if year_match:
+                            year = int(year_match.group())
+                    except:
+                        pass
         
+        # Categorize memory
         category = categorize_memory(text)
         
+        # Save to database
         db = get_db()
         cursor = db.cursor()
-        cursor.execute('''INSERT INTO memories (text, category, memory_date, year, created_at) 
-                         VALUES (?, ?, ?, ?, ?)''',
-                      (text, category, memory_date, year, datetime.now().isoformat()))
+        cursor.execute('''INSERT INTO memories 
+                         (text, category, memory_date, year, audio_filename, created_at) 
+                         VALUES (?, ?, ?, ?, ?, ?)''',
+                      (text, category, parsed_date, year, 
+                       audio_filename if audio_filename else None,
+                       datetime.now().isoformat()))
         
         db.commit()
+        memory_id = cursor.lastrowid
+        
+        # If audio was recorded, update the transcription record
+        if audio_filename:
+            cursor.execute('''UPDATE audio_transcriptions 
+                             SET transcription_text = ? 
+                             WHERE audio_filename = ?''',
+                          (text, audio_filename))
+            db.commit()
+        
         return jsonify({
             "status": "success",
-            "id": cursor.lastrowid,
+            "memory_id": memory_id,
             "category": category,
-            "year": year
+            "has_audio": bool(audio_filename)
         })
         
     except Exception as e:
+        print(f"Error saving memory: {e}")
+        import traceback
+        traceback.print_exc()  # Print full error to terminal
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/api/memories/get', methods=['GET'])
-def get_memories():
+# ADD THIS ROUTE TO app.py (after the save_memory route)
+
+@app.route('/api/memories/delete/<int:memory_id>', methods=['DELETE'])
+def delete_memory(memory_id):
+    """Delete a memory and its associated audio file."""
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT id, text, category, memory_date, year FROM memories ORDER BY year DESC")
+        
+        # Get memory details before deleting (to get audio filename)
+        cursor.execute('SELECT audio_filename FROM memories WHERE id = ?', (memory_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            return jsonify({"status": "error", "message": "Memory not found"}), 404
+        
+        audio_filename = row[0]
+        
+        # Delete the memory from database
+        cursor.execute('DELETE FROM memories WHERE id = ?', (memory_id,))
+        
+        # Delete associated comments if any
+        cursor.execute('DELETE FROM comments WHERE memory_id = ?', (memory_id,))
+        
+        db.commit()
+        
+        # Delete audio file if it exists
+        if audio_filename:
+            audio_path = os.path.join(app.config['UPLOAD_FOLDER'], audio_filename)
+            if os.path.exists(audio_path):
+                os.remove(audio_path)
+            
+            # Delete from audio_transcriptions table
+            cursor.execute('DELETE FROM audio_transcriptions WHERE audio_filename = ?', (audio_filename,))
+            db.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Memory deleted successfully",
+            "deleted_audio": bool(audio_filename)
+        })
+        
+    except Exception as e:
+        print(f"Error deleting memory: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/memories/get', methods=['GET'])
+def get_memories():
+    """Get all memories for the timeline."""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('''SELECT id, text, category, memory_date, year, 
+                         audio_filename, created_at 
+                         FROM memories 
+                         ORDER BY year DESC, created_at DESC''')
         
         memories = []
         for row in cursor.fetchall():
             memories.append({
-                "id": row[0],
-                "text": row[1],
-                "category": row[2],
-                "date": row[3],
-                "year": row[4]
+                'id': row[0],
+                'text': row[1],
+                'category': row[2],
+                'memory_date': row[3],
+                'year': row[4],
+                'audio_filename': row[5],
+                'created_at': row[6],
+                'has_audio': bool(row[5])
             })
         
-        return jsonify(memories)
+        return jsonify({
+            "status": "success",
+            "memories": memories
+        })
         
     except Exception as e:
+        print(f"Error getting memories: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
+    
 # ============================================
 # SEARCH ROUTES
 # ============================================
@@ -250,6 +346,66 @@ def ai_search():
 # ============================================
 # MEDIA ROUTES
 # ============================================
+
+# Add this to app.py - Audio Recording Routes
+
+@app.route('/api/audio/save', methods=['POST'])
+def save_audio_recording():
+    """Save voice recording to server."""
+    try:
+        if 'audio' not in request.files:
+            return jsonify({"status": "error", "message": "No audio file"}), 400
+        
+        audio_file = request.files['audio']
+        
+        if audio_file.filename == '':
+            return jsonify({"status": "error", "message": "No file selected"}), 400
+        
+        # Generate unique filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"voice_recording_{timestamp}.webm"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        # Save audio file
+        audio_file.save(filepath)
+        
+        # Get file size and duration (duration requires additional library)
+        file_size = os.path.getsize(filepath)
+        
+        # Save to database
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('''INSERT INTO audio_transcriptions 
+                         (audio_filename, transcription_text, created_at) 
+                         VALUES (?, ?, ?)''',
+                      (filename, '', datetime.now().isoformat()))
+        db.commit()
+        audio_id = cursor.lastrowid
+        
+        return jsonify({
+            "status": "success",
+            "filename": filename,
+            "audio_id": audio_id,
+            "size": file_size
+        })
+        
+    except Exception as e:
+        print(f"Error saving audio: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/audio/<filename>', methods=['GET'])
+def serve_audio(filename):
+    """Serve audio file for playback."""
+    try:
+        return send_file(
+            os.path.join(app.config['UPLOAD_FOLDER'], filename),
+            mimetype='audio/webm'
+        )
+    except Exception as e:
+        print(f"Error serving audio: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 404
+
 
 @app.route('/api/media/upload', methods=['POST'])
 def upload_media():

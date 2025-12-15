@@ -98,8 +98,11 @@
                 <button class="tab" onclick="showTab('export', event)">
                     <i class="fas fa-file-export"></i> Export
                 </button>
+                <button class="tab" onclick="window.location.href='/goodbye'">
+                    <i class="fas fa-sign-out-alt"></i> Done for Today
+                </button>
             </nav>
-            
+        
             <!-- Capture Tab -->
             <div id="capture" class="tab-content active">
                 <div class="tab-header">
@@ -135,6 +138,182 @@
                             <small class="hint">Year, season, or approximate date</small>
                         </div>
                     </div>
+
+<!-- Voice Recording Section -->
+<div class="voice-recording-section">
+    <div class="recording-header">
+        <h3><i class="fas fa-microphone"></i> Or Record Your Story</h3>
+        <p class="hint">Speak naturally - we'll transcribe your words and save your voice</p>
+    </div>
+    
+    <!-- Record Button (shown when not recording) -->
+    <button id="record-voice-btn" onclick="startVoiceRecording()" class="btn-record">
+        <i class="fas fa-microphone"></i> Start Recording
+    </button>
+    
+    <!-- Recording Controls (shown during recording) -->
+    <div id="recording-controls" style="display: none;">
+        <div class="recording-indicator">
+            <span class="recording-dot"></span>
+            <span id="recording-timer">0:00</span>
+        </div>
+        
+        <div class="recording-buttons">
+            <button id="pause-btn" onclick="togglePauseRecording()" class="btn-secondary">
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            <button onclick="stopVoiceRecording()" class="btn-stop">
+                <i class="fas fa-stop"></i> Stop & Save
+            </button>
+        </div>
+        
+        <div id="transcription-preview" class="transcription-preview">
+            Listening...
+        </div>
+    </div>
+    
+    <!-- Success Message -->
+    <div id="recording-success" class="recording-success" style="display: none;"></div>
+    
+    <!-- Hidden field to store audio filename -->
+    <input type="hidden" id="audio-filename-hidden" value="">
+</div>
+
+<!-- ADD THIS CSS TO style.css -->
+<style>
+/* Voice Recording Styles */
+.voice-recording-section {
+    margin: 20px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    color: white;
+}
+
+.recording-header h3 {
+    margin: 0 0 8px 0;
+    font-size: 1.1rem;
+    color: white;
+}
+
+.recording-header p {
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.btn-record {
+    width: 100%;
+    padding: 15px;
+    margin-top: 15px;
+    background: white;
+    color: #667eea;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-record:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.btn-record i {
+    font-size: 1.3rem;
+}
+
+#recording-controls {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.recording-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 8px;
+}
+
+.recording-dot {
+    width: 12px;
+    height: 12px;
+    background: #ff4444;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+#recording-timer {
+    font-size: 1.2rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+.recording-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.recording-buttons button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-stop {
+    background: #ff4444;
+    color: white;
+}
+
+.btn-stop:hover {
+    background: #cc0000;
+}
+
+.transcription-preview {
+    padding: 15px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    min-height: 60px;
+    font-style: italic;
+    line-height: 1.6;
+}
+
+.recording-success {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(46, 213, 115, 0.2);
+    border: 2px solid #2ed573;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.recording-success i {
+    color: #2ed573;
+    font-size: 1.2rem;
+}
+</style>
+
                     
                     <div class="capture-actions">
                         <button onclick="saveMemory()" class="btn-primary btn-large">
@@ -361,6 +540,7 @@
     <script src="/static/js/comments.js"></script>
     <script src="/static/js/export.js"></script>
     <script src="/static/js/media.js"></script>
+    <script src="/static/js/voice_recorder.js"></script>
     
     <!-- Declare global functions -->
     <script>

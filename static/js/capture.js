@@ -30,48 +30,58 @@ function suggestPrompt(type) {
     }
 }
 
+// UPDATE THIS FUNCTION IN capture.js
+
 async function saveMemory() {
     const text = document.getElementById('memory-text').value.trim();
-    const dateInput = document.getElementById('memory-date').value.trim();
+    const date = document.getElementById('memory-date').value.trim();
+    
+    // Get audio filename if recording was made
+    const audioFilename = document.getElementById('audio-filename-hidden').value;
     
     if (!text) {
-        alert('Please write something before saving.');
+        alert('Please write or record your memory first');
         return;
     }
     
     try {
         const response = await fetch('/api/memories/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
                 text: text,
-                date_input: dateInput 
+                memory_date: date,
+                audio_filename: audioFilename
             })
         });
         
         const data = await response.json();
         
         if (data.status === 'success') {
+            alert('Memory saved to your family timeline! 💝');
+            
             // Clear form
             document.getElementById('memory-text').value = '';
             document.getElementById('memory-date').value = '';
+            document.getElementById('audio-filename-hidden').value = '';
             
-            // Show success message
-            let message = `Memory saved successfully!`;
-            if (data.category) message += `\nCategory: ${data.category}`;
-            if (data.year) message += `\nYear: ${data.year}`;
+            // Hide success message if shown
+            const successMsg = document.getElementById('recording-success');
+            if (successMsg) {
+                successMsg.style.display = 'none';
+            }
             
-            alert(message);
-            
-            // Refresh timeline if active
-            if (document.getElementById('timeline').classList.contains('active')) {
-                loadMemories();
+            // Try to reload timeline if function exists
+            if (typeof loadTimeline === 'function') {
+                loadTimeline();
             }
         } else {
             alert('Error saving memory: ' + (data.message || 'Unknown error'));
         }
     } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to save memory. Please make sure the server is running.');
+        console.error('Error saving memory:', error);
+        alert('Error saving memory. Please try again.');
     }
 }
