@@ -86,11 +86,7 @@ scan_existing_uploads()
 # ============================================
 
 @app.route('/')
-def landing():
-    return render_template('landing.html')
-
-@app.route('/app')
-def main_app():
+def index():
     return render_template('index.html')
 
 @app.route('/api/health', methods=['GET'])
