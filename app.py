@@ -279,7 +279,7 @@ def get_memories():
         cursor.execute('''SELECT id, text, category, memory_date, year, 
                          audio_filename, created_at 
                          FROM memories 
-                         ORDER BY year DESC, created_at DESC''')
+                         ORDER BY COALESCE(year, 9999) ASC, created_at ASC''')
         
         memories = []
         for row in cursor.fetchall():
