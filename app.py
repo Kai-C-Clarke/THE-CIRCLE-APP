@@ -3,6 +3,7 @@ from flask import Flask, render_template, jsonify, request, send_file
 from flask_cors import CORS
 import os
 from datetime import datetime
+from ai_photo_matcher import suggest_photos_for_memory, apply_suggestion, suggest_all_memories
 
 # Import our modules
 from database import init_db, get_db, migrate_db
@@ -187,8 +188,7 @@ def save_memory():
                         pass
         
         # Categorize memory
-        category = categorize_memory(text)
-        
+        category = categorize_memory(text, year=year)
         # Save to database
         db = get_db()
         cursor = db.cursor()
@@ -303,9 +303,228 @@ def get_memories():
         print(f"Error getting memories: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
     
+# Copy these routes into your app.py or create media_linking_routes.py
+@app.route('/api/memories/<int:memory_id>/media', methods=['GET'])
+def get_memory_media(memory_id):
+    """Get all media linked to a specific memory."""
+    try:
+        db = get_db()
+        cursor = db.execute('''
+            SELECT m.id, m.filename, m.original_filename, m.file_type, 
+                   m.title, m.description, m.media_date, m.year, 
+                   mm.display_order
+            FROM media m
+            JOIN memory_media mm ON m.id = mm.media_id
+            WHERE mm.memory_id = ?
+            ORDER BY mm.display_order
+        ''', (memory_id,))
+        
+        media = []
+        for row in cursor.fetchall():
+            media.append({
+                'id': row[0],
+                'filename': row[1],
+                'original_filename': row[2],
+                'file_type': row[3],
+                'title': row[4],
+                'description': row[5],
+                'media_date': row[6],
+                'year': row[7],
+                'display_order': row[8]
+            })
+        
+        return jsonify({'success': True, 'media': media})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/memories/<int:memory_id>/media/<int:media_id>', methods=['POST'])
+def add_media_to_memory(memory_id, media_id):
+    """Link a single media item to a memory."""
+    try:
+        db = get_db()
+        cursor = db.execute(
+            'SELECT COALESCE(MAX(display_order), -1) FROM memory_media WHERE memory_id = ?',
+            (memory_id,)
+        )
+        max_order = cursor.fetchone()[0]
+        
+        db.execute(
+            'INSERT OR IGNORE INTO memory_media (memory_id, media_id, display_order) VALUES (?, ?, ?)',
+            (memory_id, media_id, max_order + 1)
+        )
+        db.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/memories/<int:memory_id>/media/<int:media_id>', methods=['DELETE'])
+def remove_media_from_memory(memory_id, media_id):
+    """Remove a media link."""
+    try:
+        db = get_db()
+        db.execute('DELETE FROM memory_media WHERE memory_id = ? AND media_id = ?', 
+                  (memory_id, media_id))
+        db.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Additional media linking routes
+@app.route('/api/memories/<int:memory_id>/media', methods=['POST'])
+def link_multiple_media_to_memory(memory_id):
+    """Link multiple media items to a memory at once (bulk operation)."""
+    try:
+        data = request.json
+        media_ids = data.get('media_ids', [])
+        
+        db = get_db()
+        
+        # Clear existing links for this memory
+        db.execute('DELETE FROM memory_media WHERE memory_id = ?', (memory_id,))
+        
+        # Add new links with order
+        for order, media_id in enumerate(media_ids):
+            db.execute(
+                'INSERT INTO memory_media (memory_id, media_id, display_order) VALUES (?, ?, ?)',
+                (memory_id, media_id, order)
+            )
+        
+        db.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Linked {len(media_ids)} media items to memory'
+        })
+    
+    except Exception as e:
+        db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/media/available', methods=['GET'])
+def get_available_media():
+    """Get all available media for linking (used by photo picker UI)."""
+    try:
+        db = get_db()
+        cursor = db.execute('''
+            SELECT id, filename, original_filename, file_type, 
+                   title, description, memory_date, year, created_at
+            FROM media
+            ORDER BY 
+                CASE WHEN year IS NOT NULL THEN year ELSE 9999 END DESC,
+                created_at DESC
+        ''')
+        
+        media = []
+        for row in cursor.fetchall():
+            media.append({
+                'id': row[0],
+                'filename': row[1],
+                'original_filename': row[2],
+                'file_type': row[3],
+                'title': row[4],
+                'description': row[5],
+                'media_date': row[6],
+                'year': row[7],
+                'created_at': row[8]
+            })
+        
+        return jsonify({'success': True, 'media': media})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500    
+    
 # ============================================
 # SEARCH ROUTES
 # ============================================
+
+@app.route('/api/memories/<int:memory_id>', methods=['PUT'])
+def update_memory(memory_id):
+    """Update an existing memory."""
+    try:
+        data = request.json
+        text = data.get('text', '').strip()
+        date_input = data.get('date', '').strip()
+        
+        if not text:
+            return jsonify({"status": "error", "message": "Memory text is required"}), 400
+        
+        # Parse date - parse_date_input returns (date_string, year) tuple
+        fuzzy_date = None
+        year = None
+        if date_input:
+            date_result = parse_date_input(date_input)
+            if date_result:
+                if isinstance(date_result, tuple):
+                    fuzzy_date, year = date_result
+                else:
+                    fuzzy_date = date_result
+        
+        # Get category
+        category = categorize_memory(text, year=year)
+        
+        # Update memory
+        db = get_db()
+        db.execute('''
+            UPDATE memories 
+            SET text = ?, category = ?, memory_date = ?, year = ?
+            WHERE id = ?
+        ''', (text, category, fuzzy_date, year, memory_id))
+        
+        db.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Memory updated successfully",
+            "memory": {
+                "id": memory_id,
+                "text": text,
+                "category": category,
+                "year": year,
+                "date": fuzzy_date
+            }
+        })
+        
+    except Exception as e:
+        print(f"Update memory error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/memories/<int:memory_id>', methods=['GET'])
+def get_memory(memory_id):
+    """Get a specific memory for editing."""
+    try:
+        db = get_db()
+        cursor = db.execute('''
+            SELECT id, text, category, memory_date, year, created_at
+            FROM memories
+            WHERE id = ?
+        ''', (memory_id,))
+        
+        memory = cursor.fetchone()
+        
+        if not memory:
+            return jsonify({"status": "error", "message": "Memory not found"}), 404
+        
+        mem_id, text, category, memory_date, year, created_at = memory
+        
+        return jsonify({
+            "status": "success",
+            "memory": {
+                "id": mem_id,
+                "text": text,
+                "category": category,
+                "memory_date": memory_date,
+                "year": year,
+                "created_at": created_at
+            }
+        })
+        
+    except Exception as e:
+        print(f"Get memory error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/search/smart', methods=['POST'])
 def smart_search():
@@ -644,6 +863,93 @@ def update_media(media_id):
     except Exception as e:
         print(f"Update media error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+# ============================================
+# AI PHOTO MATCHING ROUTES
+# ============================================
+
+@app.route('/api/memories/<int:memory_id>/suggest-photos', methods=['GET'])
+def get_photo_suggestions(memory_id):
+    """Get AI-suggested photos for a memory."""
+    try:
+        threshold = request.args.get('threshold', 70, type=int)
+        
+        suggestions = suggest_photos_for_memory(
+            memory_id, 
+            confidence_threshold=threshold
+        )
+        
+        return jsonify({
+            'success': True,
+            'memory_id': memory_id,
+            'suggestions': suggestions,
+            'threshold': threshold
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/memories/<int:memory_id>/accept-suggestion', methods=['POST'])
+def accept_photo_suggestion(memory_id):
+    """Accept an AI photo suggestion and link it."""
+    try:
+        data = request.json
+        photo_id = data.get('photo_id')
+        
+        if not photo_id:
+            return jsonify({
+                'success': False,
+                'error': 'photo_id required'
+            }), 400
+        
+        apply_suggestion(memory_id, photo_id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Photo {photo_id} linked to memory {memory_id}'
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/memories/suggest-all', methods=['POST'])
+def suggest_all_photos():
+    """Get AI suggestions for all memories (batch processing)."""
+    try:
+        data = request.json or {}
+        threshold = data.get('threshold', 70)
+        
+        all_suggestions = suggest_all_memories(
+            confidence_threshold=threshold
+        )
+        
+        # Count totals
+        total_suggestions = sum(len(sug) for sug in all_suggestions.values())
+        
+        return jsonify({
+            'success': True,
+            'suggestions': all_suggestions,
+            'summary': {
+                'memories_with_suggestions': len(all_suggestions),
+                'total_suggestions': total_suggestions,
+                'threshold': threshold
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # ============================================
 # PDF ROUTES
 # ============================================
