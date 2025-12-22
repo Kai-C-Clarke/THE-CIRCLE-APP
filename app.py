@@ -333,9 +333,9 @@ def get_memory_media(memory_id):
                 'display_order': row[8]
             })
         
-        return jsonify({'success': True, 'media': media})
+        return jsonify({'status': 'success', 'media': media})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/api/memories/<int:memory_id>/media/<int:media_id>', methods=['POST'])
 def add_media_to_memory(memory_id, media_id):
@@ -354,10 +354,10 @@ def add_media_to_memory(memory_id, media_id):
         )
         db.commit()
         
-        return jsonify({'success': True})
+        return jsonify({'status': 'success'})
     except Exception as e:
         db.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/api/memories/<int:memory_id>/media/<int:media_id>', methods=['DELETE'])
 def remove_media_from_memory(memory_id, media_id):
@@ -367,10 +367,10 @@ def remove_media_from_memory(memory_id, media_id):
         db.execute('DELETE FROM memory_media WHERE memory_id = ? AND media_id = ?', 
                   (memory_id, media_id))
         db.commit()
-        return jsonify({'success': True})
+        return jsonify({'status': 'success'})
     except Exception as e:
         db.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 # Additional media linking routes
 @app.route('/api/memories/<int:memory_id>/media', methods=['POST'])
@@ -395,13 +395,13 @@ def link_multiple_media_to_memory(memory_id):
         db.commit()
         
         return jsonify({
-            'success': True, 
+            'status': 'success', 
             'message': f'Linked {len(media_ids)} media items to memory'
         })
     
     except Exception as e:
         db.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @app.route('/api/media/available', methods=['GET'])
 def get_available_media():
@@ -431,10 +431,10 @@ def get_available_media():
                 'created_at': row[8]
             })
         
-        return jsonify({'success': True, 'media': media})
+        return jsonify({'status': 'success', 'media': media})
     
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500    
+        return jsonify({'status': 'error', 'error': str(e)}), 500    
     
 # ============================================
 # SEARCH ROUTES
@@ -882,7 +882,7 @@ def update_media(media_id):
 def get_photo_suggestions(memory_id):
     """Get AI-suggested photos for a memory."""
     try:
-        threshold = request.args.get('threshold', 70, type=int)
+        threshold = request.args.get("threshold", 50, type=int)
         
         suggestions = suggest_photos_for_memory(
             memory_id, 
@@ -890,7 +890,7 @@ def get_photo_suggestions(memory_id):
         )
         
         return jsonify({
-            'success': True,
+            'status': 'success',
             'memory_id': memory_id,
             'suggestions': suggestions,
             'threshold': threshold
@@ -898,7 +898,7 @@ def get_photo_suggestions(memory_id):
     
     except Exception as e:
         return jsonify({
-            'success': False,
+            'status': 'error',
             'error': str(e)
         }), 500
 
@@ -912,20 +912,20 @@ def accept_photo_suggestion(memory_id):
         
         if not photo_id:
             return jsonify({
-                'success': False,
+                'status': 'error',
                 'error': 'photo_id required'
             }), 400
         
         apply_suggestion(memory_id, photo_id)
         
         return jsonify({
-            'success': True,
+            'status': 'success',
             'message': f'Photo {photo_id} linked to memory {memory_id}'
         })
     
     except Exception as e:
         return jsonify({
-            'success': False,
+            'status': 'error',
             'error': str(e)
         }), 500
 
@@ -945,7 +945,7 @@ def suggest_all_photos():
         total_suggestions = sum(len(sug) for sug in all_suggestions.values())
         
         return jsonify({
-            'success': True,
+            'status': 'success',
             'suggestions': all_suggestions,
             'summary': {
                 'memories_with_suggestions': len(all_suggestions),
@@ -956,7 +956,7 @@ def suggest_all_photos():
     
     except Exception as e:
         return jsonify({
-            'success': False,
+            'status': 'error',
             'error': str(e)
         }), 500
 
