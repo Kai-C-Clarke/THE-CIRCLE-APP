@@ -20,6 +20,20 @@ from pdf_generator import generate_memory_pdf, generate_family_album_pdf
 from werkzeug.utils import secure_filename
 import uuid
 
+# Import authentication
+from auth import (
+    login_required,
+    admin_required,
+    create_user,
+    verify_password,
+    login_user,
+    logout_user,
+    get_current_user,
+    change_password,
+    has_users,
+    create_initial_admin
+)
+
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
 # Security Configuration
@@ -47,6 +61,19 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max file size
 
 init_db()
 migrate_db()
+
+# Initialize authentication - create admin if no users exist
+if not has_users():
+    print("=" * 60)
+    print("🔐 NO USERS FOUND - Creating initial admin account...")
+    print("=" * 60)
+    success, result = create_initial_admin()
+    if success:
+        print(f"✅ Admin account created successfully!")
+        print(f"   Username: {result['username']}")
+        print(f"   Password: {result['password']}")
+        print("⚠️  IMPORTANT: Change this password immediately after login!")
+        print("=" * 60)
 
 # ============================================
 # SECURITY FUNCTIONS
@@ -244,12 +271,137 @@ def goodbye():
 
 
 # ============================================
+# AUTHENTICATION ROUTES
+# ============================================
+
+
+@app.route("/api/auth/register", methods=["POST"])
+def register():
+    """Register a new user account."""
+    try:
+        data = request.json
+        username = data.get("username")
+        email = data.get("email")
+        password = data.get("password")
+
+        if not username or not email or not password:
+            return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
+        success, result = create_user(username, email, password)
+
+        if success:
+            return jsonify({"status": "success", "message": "Account created successfully", "user_id": result}), 201
+        else:
+            return jsonify({"status": "error", "message": result}), 400
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+    """Log in a user."""
+    try:
+        data = request.json
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return jsonify({"status": "error", "message": "Username and password required"}), 400
+
+        user = verify_password(username, password)
+
+        if user:
+            login_user(user)
+            return jsonify({
+                "status": "success",
+                "message": "Login successful",
+                "user": user.to_dict()
+            }), 200
+        else:
+            return jsonify({"status": "error", "message": "Invalid username or password"}), 401
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def logout():
+    """Log out the current user."""
+    try:
+        logout_user()
+        return jsonify({"status": "success", "message": "Logged out successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/auth/me", methods=["GET"])
+@login_required
+def get_current_user_info():
+    """Get information about the currently logged-in user."""
+    try:
+        current_user = get_current_user()
+        if current_user:
+            return jsonify({
+                "status": "success",
+                "user": current_user.to_dict()
+            }), 200
+        else:
+            return jsonify({"status": "error", "message": "Not authenticated"}), 401
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/auth/change-password", methods=["POST"])
+@login_required
+def change_password_route():
+    """Change the current user's password."""
+    try:
+        data = request.json
+        old_password = data.get("old_password")
+        new_password = data.get("new_password")
+
+        if not old_password or not new_password:
+            return jsonify({"status": "error", "message": "Both old and new passwords required"}), 400
+
+        current_user = get_current_user()
+        success, message = change_password(current_user.id, old_password, new_password)
+
+        if success:
+            return jsonify({"status": "success", "message": message}), 200
+        else:
+            return jsonify({"status": "error", "message": message}), 400
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/auth/status", methods=["GET"])
+def auth_status():
+    """Check if user is authenticated."""
+    try:
+        current_user = get_current_user()
+        if current_user:
+            return jsonify({
+                "authenticated": True,
+                "user": current_user.to_dict()
+            }), 200
+        else:
+            return jsonify({"authenticated": False}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============================================
 # PROFILE ROUTES
 # ============================================
 
 
 @app.route("/api/profile/save", methods=["POST"])
-@requires_auth
+@login_required
 def save_profile():
     try:
         data = request.json
@@ -306,7 +458,7 @@ def get_profile():
 
 
 @app.route("/api/memories/save", methods=["POST"])
-@requires_auth
+@login_required
 def save_memory():
     """Save a new memory with optional audio recording."""
     try:
@@ -395,7 +547,7 @@ def save_memory():
 
 
 @app.route("/api/memories/delete/<int:memory_id>", methods=["DELETE"])
-@requires_auth
+@login_required
 def delete_memory(memory_id):
     """Delete a memory and its associated audio file."""
     try:
@@ -871,7 +1023,7 @@ def serve_audio(filename):
 
 
 @app.route("/api/media/upload", methods=["POST"])
-@requires_auth
+@login_required
 def upload_media():
     try:
         if "media" not in request.files:
@@ -1054,7 +1206,7 @@ def get_all_media():
 
 
 @app.route("/api/media/delete/<int:media_id>", methods=["DELETE"])
-@requires_auth
+@login_required
 def delete_media(media_id):
     """Delete a media file."""
     try:

@@ -18,6 +18,21 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
+    # Users table for authentication
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT 1,
+        is_admin BOOLEAN DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT,
+        last_login TEXT
+    )"""
+    )
+
     # User profile
     cursor.execute(
         """CREATE TABLE IF NOT EXISTS user_profile (
@@ -112,7 +127,7 @@ def init_db():
 
 
 def migrate_db():
-    """Add file_size column and database indexes if they don't exist."""
+    """Add file_size column, users table, and database indexes if they don't exist."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -126,6 +141,26 @@ def migrate_db():
             conn.commit()
             print("✓ Added file_size column to media table")
 
+        # Check if users table exists (for authentication)
+        cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='users'
+        """)
+        if not cursor.fetchone():
+            cursor.execute('''CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT 1,
+                is_admin BOOLEAN DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT,
+                last_login TEXT
+            )''')
+            conn.commit()
+            print("✓ Created users table for authentication")
+
         # Add performance indexes
         add_database_indexes(cursor)
         conn.commit()
@@ -138,6 +173,10 @@ def migrate_db():
 def add_database_indexes(cursor):
     """Add database indexes for improved query performance."""
     indexes = [
+        # Users table indexes for authentication
+        ("idx_users_username", "users", "username"),
+        ("idx_users_email", "users", "email"),
+        ("idx_users_active", "users", "is_active"),
         # Foreign key indexes for faster joins
         ("idx_comments_memory_id", "comments", "memory_id"),
         ("idx_memory_tags_memory_id", "memory_tags", "memory_id"),
