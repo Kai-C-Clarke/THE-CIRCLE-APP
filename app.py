@@ -1,9 +1,11 @@
 # app.py - Main Flask application
-from flask import Flask, render_template, jsonify, request, send_file
+from flask import Flask, render_template, jsonify, request, send_file, session
 from flask_cors import CORS
 import os
 from datetime import datetime
 from ai_photo_matcher import suggest_photos_for_memory, apply_suggestion, suggest_all_memories
+from functools import wraps
+import secrets
 
 # Import our modules
 from database import init_db, get_db, migrate_db
@@ -15,7 +17,17 @@ from werkzeug.utils import secure_filename
 import uuid
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-CORS(app)
+
+# Security Configuration
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+
+# CORS Configuration - restrict to specific origins
+allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000').split(',')
+CORS(app,
+     origins=allowed_origins,
+     supports_credentials=True,
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'])
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +39,94 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 
 init_db()
 migrate_db()
+
+# ============================================
+# SECURITY FUNCTIONS
+# ============================================
+
+def safe_file_path(filename, base_directory):
+    """
+    Safely construct file path preventing path traversal attacks.
+
+    Args:
+        filename: User-provided filename
+        base_directory: Base directory to serve files from
+
+    Returns:
+        Absolute path if safe, raises ValueError otherwise
+    """
+    # Sanitize filename to remove path components
+    safe_name = secure_filename(filename)
+
+    if not safe_name:
+        raise ValueError("Invalid filename")
+
+    # Build full path
+    full_path = os.path.abspath(os.path.join(base_directory, safe_name))
+    base_path = os.path.abspath(base_directory)
+
+    # Ensure resolved path is within base directory
+    if not full_path.startswith(base_path + os.sep):
+        raise ValueError("Path traversal attempt detected")
+
+    return full_path
+
+def check_auth():
+    """
+    Check if request is authenticated.
+
+    Authentication options (in order of priority):
+    1. Session-based (after login)
+    2. Environment variable APP_PASSWORD (for development)
+    3. No password set (allows access - for initial setup only)
+
+    Returns:
+        bool: True if authenticated, False otherwise
+    """
+    # Check if authenticated via session
+    if session.get('authenticated'):
+        return True
+
+    # Check if password is required
+    required_password = os.environ.get('APP_PASSWORD')
+
+    # If no password is set, allow access (development mode)
+    # WARNING: Set APP_PASSWORD in production!
+    if not required_password:
+        return True
+
+    # Check HTTP Basic Auth header
+    auth = request.authorization
+    if auth and auth.password == required_password:
+        session['authenticated'] = True
+        return True
+
+    return False
+
+def requires_auth(f):
+    """
+    Decorator to require authentication on routes.
+
+    Usage:
+        @app.route('/api/protected')
+        @requires_auth
+        def protected_route():
+            ...
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not check_auth():
+            return jsonify({
+                "status": "error",
+                "message": "Authentication required",
+                "hint": "Set APP_PASSWORD environment variable and use HTTP Basic Auth"
+            }), 401
+        return f(*args, **kwargs)
+    return decorated
+
+# ============================================
+# HELPER FUNCTIONS
+# ============================================
 
 # Add to app.py after init_db()
 def scan_existing_uploads():
@@ -112,6 +212,7 @@ def goodbye():
 # ============================================
 
 @app.route('/api/profile/save', methods=['POST'])
+@requires_auth
 def save_profile():
     try:
         data = request.json
@@ -156,6 +257,7 @@ def get_profile():
 # ============================================
 
 @app.route('/api/memories/save', methods=['POST'])
+@requires_auth
 def save_memory():
     """Save a new memory with optional audio recording."""
     try:
@@ -226,6 +328,7 @@ def save_memory():
 # ADD THIS ROUTE TO app.py (after the save_memory route)
 
 @app.route('/api/memories/delete/<int:memory_id>', methods=['DELETE'])
+@requires_auth
 def delete_memory(memory_id):
     """Delete a memory and its associated audio file."""
     try:
@@ -441,6 +544,7 @@ def get_available_media():
 # ============================================
 
 @app.route('/api/memories/<int:memory_id>', methods=['PUT'])
+@requires_auth
 def update_memory(memory_id):
     """Update an existing memory."""
     try:
@@ -583,6 +687,7 @@ def ai_search():
 # Add this to app.py - Audio Recording Routes
 
 @app.route('/api/audio/save', methods=['POST'])
+@requires_auth
 def save_audio_recording():
     """Save voice recording to server."""
     try:
@@ -631,16 +736,24 @@ def save_audio_recording():
 def serve_audio(filename):
     """Serve audio file for playback."""
     try:
-        return send_file(
-            os.path.join(app.config['UPLOAD_FOLDER'], filename),
-            mimetype='audio/webm'
-        )
+        # Prevent path traversal attacks
+        filepath = safe_file_path(filename, app.config['UPLOAD_FOLDER'])
+
+        if not os.path.exists(filepath):
+            return jsonify({"status": "error", "message": "File not found"}), 404
+
+        return send_file(filepath, mimetype='audio/webm')
+
+    except ValueError as e:
+        # Path traversal attempt
+        return jsonify({"status": "error", "message": "Invalid filename"}), 400
     except Exception as e:
         print(f"Error serving audio: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 404
+        return jsonify({"status": "error", "message": "Server error"}), 500
 
 
 @app.route('/api/media/upload', methods=['POST'])
+@requires_auth
 def upload_media():
     try:
         if 'media' not in request.files:
@@ -729,21 +842,25 @@ def upload_media():
 def serve_uploaded_file(filename):
     """Serve uploaded files directly."""
     try:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
+        # Prevent path traversal attacks
+        filepath = safe_file_path(filename, app.config['UPLOAD_FOLDER'])
+
         # Check if file exists
         if not os.path.exists(filepath):
             return jsonify({"status": "error", "message": "File not found"}), 404
-        
+
         # For images, serve with proper caching
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
             cache_timeout = 31536000  # 1 year cache for images
             return send_file(filepath, mimetype='image/jpeg')
-        
+
         return send_file(filepath)
-        
+
+    except ValueError as e:
+        # Path traversal attempt
+        return jsonify({"status": "error", "message": "Invalid filename"}), 400
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "Server error"}), 500
 
 
 @app.route('/api/media/all', methods=['GET'])
@@ -782,6 +899,7 @@ def get_all_media():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/media/delete/<int:media_id>', methods=['DELETE'])
+@requires_auth
 def delete_media(media_id):
     """Delete a media file."""
     try:
@@ -815,19 +933,24 @@ def delete_media(media_id):
 def media_preview(filename):
     """Generate thumbnail/preview for images."""
     try:
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
+        # Prevent path traversal attacks
+        filepath = safe_file_path(filename, app.config['UPLOAD_FOLDER'])
+
         if not os.path.exists(filepath):
             return jsonify({"status": "error", "message": "File not found"}), 404
-        
+
         # For now, just serve the original image
         # In a production app, you'd resize images here
         return send_file(filepath)
-        
+
+    except ValueError as e:
+        # Path traversal attempt
+        return jsonify({"status": "error", "message": "Invalid filename"}), 400
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "Server error"}), 500
 
 @app.route('/api/media/<int:media_id>/update', methods=['PUT'])
+@requires_auth
 def update_media(media_id):
     """Update media title and description."""
     try:
@@ -1007,7 +1130,21 @@ if __name__ == '__main__':
     print("="*60)
     print(f"Local URL: http://localhost:5000")
     print(f"AI Search: {'ENABLED' if ai_searcher.client else 'DISABLED (set DEEPSEEK_API_KEY)'}")
+
+    # Security warnings
+    if not os.environ.get('APP_PASSWORD'):
+        print("\n⚠️  WARNING: No password protection enabled!")
+        print("   Set APP_PASSWORD environment variable to secure your app")
+        print("   Example: export APP_PASSWORD='your-secure-password'")
+
+    if not os.environ.get('SECRET_KEY'):
+        print("\n⚠️  WARNING: Using auto-generated SECRET_KEY")
+        print("   Set SECRET_KEY environment variable for production")
+        print("   Generate: python -c \"import secrets; print(secrets.token_hex(32))\"")
+
     print("="*60)
     print("Press Ctrl+C to stop the server\n")
-    
-    app.run(debug=True, port=5000)
+
+    # Use environment variable for debug mode
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug_mode, port=5000)
