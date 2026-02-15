@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Cast — Email Anyone. Hear Back From Someone Extraordinary.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Oswald:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --crimson: #8B1A1A;
+      --gold: #C9A84C;
+      --gold-light: #E8D5A3;
+      --cream: #F5EDD8;
+      --parchment: #EDE0C4;
+      --dark: #0F0A05;
+      --dark-mid: #1A1208;
+      --velvet: #1C0F0F;
+      --text: #D4C4A0;
+      --text-dim: #8A7A60;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: var(--dark);
+      color: var(--text);
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 18px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* Grain texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-size: 128px 128px;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 20px 60px;
+      position: relative;
+      background: radial-gradient(ellipse at 50% 30%, #3A1A0A 0%, #1A0A04 40%, var(--dark) 100%);
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    }
+
+    .playbill-border {
+      border: 2px solid var(--gold);
+      padding: 3px;
+      display: inline-block;
+      margin-bottom: 40px;
+      animation: fadeIn 1.2s ease both;
+    }
+
+    .playbill-border-inner {
+      border: 1px solid var(--gold);
+      padding: 40px 60px;
+    }
+
+    .presents {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.5em;
+      font-size: 0.75rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      animation: fadeIn 1.4s ease both;
+    }
+
+    .title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(4rem, 12vw, 9rem);
+      font-weight: 900;
+      line-height: 0.9;
+      color: var(--cream);
+      letter-spacing: -0.02em;
+      animation: fadeIn 1s ease both;
+    }
+
+    .title span {
+      color: var(--gold);
+    }
+
+    .subtitle {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+      color: var(--gold-light);
+      margin-top: 20px;
+      animation: fadeIn 1.6s ease both;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 32px auto;
+      max-width: 300px;
+      animation: fadeIn 1.8s ease both;
+    }
+
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: var(--gold);
+      opacity: 0.5;
+    }
+
+    .divider-diamond {
+      width: 8px;
+      height: 8px;
+      background: var(--gold);
+      transform: rotate(45deg);
+    }
+
+    .hero-desc {
+      font-size: 1.15rem;
+      color: var(--text);
+      max-width: 580px;
+      margin: 0 auto;
+      animation: fadeIn 2s ease both;
+    }
+
+    .cta-row {
+      margin-top: 40px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      animation: fadeIn 2.2s ease both;
+    }
+
+    .cta-btn {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 400;
+      letter-spacing: 0.2em;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      padding: 14px 32px;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      text-decoration: none;
+      transition: all 0.3s ease;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .cta-btn:hover {
+      background: var(--gold);
+      color: var(--dark);
+    }
+
+    .cta-btn.filled {
+      background: var(--gold);
+      color: var(--dark);
+    }
+
+    .cta-btn.filled:hover {
+      background: var(--gold-light);
+    }
+
+    /* ── HOW IT WORKS ── */
+    .how {
+      background: var(--dark-mid);
+      padding: 80px 20px;
+      text-align: center;
+      position: relative;
+    }
+
+    .section-label {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.4em;
+      font-size: 0.7rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 700;
+      color: var(--cream);
+      margin-bottom: 16px;
+    }
+
+    .section-title em {
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 40px;
+      max-width: 900px;
+      margin: 60px auto 0;
+    }
+
+    .step {
+      text-align: center;
+    }
+
+    .step-number {
+      font-family: 'Playfair Display', serif;
+      font-size: 4rem;
+      font-weight: 900;
+      color: var(--crimson);
+      opacity: 0.4;
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .step-title {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 400;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+
+    .step p {
+      font-size: 0.95rem;
+      color: var(--text-dim);
+    }
+
+    /* ── CAST ── */
+    .cast-section {
+      padding: 80px 20px;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    .cast-header {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    /* Category dividers */
+    .category-heading {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin: 60px 0 40px;
+    }
+
+    .category-heading-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: 0.3;
+    }
+
+    .category-heading-text {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.4em;
+      font-size: 0.7rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* Cards grid */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 2px;
+    }
+
+    .card {
+      background: var(--velvet);
+      padding: 36px 32px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease, background 0.3s ease;
+      cursor: default;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--gold);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .card:hover {
+      background: #251510;
+      transform: translateY(-2px);
+    }
+
+    .card:hover::before {
+      opacity: 1;
+    }
+
+    .card-avatar {
+      font-size: 3.5rem;
+      margin-bottom: 16px;
+      display: block;
+      line-height: 1;
+    }
+
+    .card-portrait {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+      margin-bottom: 20px;
+      filter: sepia(15%) contrast(1.05);
+      transition: filter 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover .card-portrait {
+      filter: sepia(0%) contrast(1.1);
+      transform: scale(1.03);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+    }
+
+    .card-portrait.bw {
+      filter: grayscale(100%) contrast(1.05);
+    }
+
+    .card:hover .card-portrait.bw {
+      filter: grayscale(80%) contrast(1.1);
+      transform: scale(1.03);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.4);
+    }
+
+    .card-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--cream);
+      margin-bottom: 4px;
+    }
+
+    .card-role {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 300;
+      letter-spacing: 0.2em;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+
+    .card-desc {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .card-sample {
+      background: rgba(201, 168, 76, 0.06);
+      border-left: 2px solid var(--gold);
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-style: italic;
+      font-size: 0.85rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .card-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+    .card-chat { display: inline-block; padding: 6px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(201,168,76,0.4); color: #c9a84c; font-family: "Oswald", sans-serif; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; text-decoration: none; transition: all 0.3s ease; }
+    .card-chat:hover { background: rgba(201,168,76,0.2); border-color: #c9a84c; }
+    .card-email {
+      display: inline-block;
+      font-family: 'Oswald', sans-serif;
+      font-weight: 400;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      color: var(--gold);
+      text-decoration: none;
+      border: 1px solid rgba(201, 168, 76, 0.3);
+      padding: 8px 16px;
+      transition: all 0.2s ease;
+    }
+
+    .card-email:hover {
+      background: var(--gold);
+      color: var(--dark);
+      border-color: var(--gold);
+    }
+
+    /* ── SAMPLE EXCHANGE ── */
+    .sample-section {
+      background: var(--dark-mid);
+      padding: 80px 20px;
+    }
+
+    .sample-inner {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .email-thread {
+      margin-top: 50px;
+    }
+
+    .email-msg {
+      margin-bottom: 24px;
+      animation: fadeIn 0.5s ease both;
+    }
+
+    .email-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .email-from {
+      font-family: 'Oswald', sans-serif;
+      font-weight: 400;
+      font-size: 0.8rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+
+    .email-to-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .email-bubble {
+      background: var(--velvet);
+      padding: 24px 28px;
+      border-left: 3px solid var(--crimson);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .email-bubble.reply {
+      border-left-color: var(--gold);
+      background: #1F1208;
+    }
+
+    .email-bubble .signoff {
+      margin-top: 16px;
+      color: var(--gold);
+      font-style: italic;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center;
+      padding: 60px 20px;
+      border-top: 1px solid rgba(201, 168, 76, 0.15);
+    }
+
+    .footer-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--cream);
+      margin-bottom: 12px;
+    }
+
+    .footer-sub {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      margin-bottom: 30px;
+    }
+
+    .footer-note {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      opacity: 0.5;
+      margin-top: 40px;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* scroll reveal */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    @media (max-width: 600px) {
+      .playbill-border-inner { padding: 28px 24px; }
+      .cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── HERO ── -->
+  <section class="hero">
+    <div class="playbill-border">
+      <div class="playbill-border-inner">
+        <p class="presents">askian.net &nbsp;·&nbsp; presents</p>
+        <h1 class="title">The<br><span>Cast</span></h1>
+        <p class="subtitle">Email anyone. Hear back from someone extraordinary.</p>
+      </div>
+    </div>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-diamond"></div>
+      <div class="divider-line"></div>
+    </div>
+
+    <p class="hero-desc">
+      Send an email to any member of The Cast and receive a genuine reply —
+      in character, in voice, and in their own particular world.
+      Historical figures. Comic creations. All at your service.
+    </p>
+
+    <div class="cta-row">
+      <a href="#cast" class="cta-btn filled">Meet the Cast</a>
+      <a href="#how" class="cta-btn">How It Works</a>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ── -->
+  <section class="how" id="how">
+    <p class="section-label">Simple as writing a letter</p>
+    <h2 class="section-title">How it <em>works</em></h2>
+
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-number">I</div>
+        <p class="step-title">Choose your correspondent</p>
+        <p>Pick anyone from The Cast. Each has their own email address, their own voice, and their own peculiar view of the world.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-number">II</div>
+        <p class="step-title">Write them a letter</p>
+        <p>Ask anything. Seek advice. Start an argument. They will reply as themselves — fully in character, within minutes.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-number">III</div>
+        <p class="step-title">Receive their reply</p>
+        <p>Straight to your inbox. Henry may be imperious. Dave will find a conspiracy. Chantelle will be distracted by her nails. That is the point.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── THE CAST ── -->
+  <section class="cast-section" id="cast">
+    <div class="cast-header reveal">
+      <p class="section-label">The company</p>
+      <h2 class="section-title">Meet <em>The Cast</em></h2>
+    </div>
+
+    <!-- Historical Figures -->
+    <div class="category-heading reveal">
+      <div class="category-heading-line"></div>
+      <span class="category-heading-text">Historical Figures</span>
+      <div class="category-heading-line"></div>
+    </div>
+
+    <div class="cards">
+      <div class="card reveal">
+        <img src="henry_viii_portrait.jpg" alt="Henry VIII" class="card-portrait">
+        <h3 class="card-name">Henry VIII</h3>
+        <p class="card-role">King of England · 1491–1547</p>
+        <p class="card-desc">Imperious, witty, theologically opinionated, and accustomed to being obeyed. He will answer your question, but he will answer it as a king.</p>
+        <div class="card-sample">"By God's blood, this is a strange question to put before a king. I shall answer it plainly..."</div>
+        <div class="card-links"><a href="mailto:henry@askian.net" class="card-email">henry@askian.net</a><a href="chat.html?c=henry" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="nikola_tesla_portrait.jpg" alt="Nikola Tesla" class="card-portrait bw">
+        <h3 class="card-name">Nikola Tesla</h3>
+        <p class="card-role">Inventor & Electrical Engineer · 1856–1943</p>
+        <p class="card-desc">Precise, passionate, eccentric, and quietly resentful of Edison. Extraordinarily enthusiastic about science. Genuinely loves pigeons.</p>
+        <div class="card-sample">"Your question touches upon principles I have contemplated at length. Allow me to illuminate..."</div>
+        <div class="card-links"><a href="mailto:tesla@askian.net" class="card-email">tesla@askian.net</a><a href="chat.html?c=tesla" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="william_shakespeare_portrait.jpg" alt="William Shakespeare" class="card-portrait">
+        <h3 class="card-name">William Shakespeare</h3>
+        <p class="card-role">Playwright & Poet · 1564–1616</p>
+        <p class="card-desc">Witty, bawdy, profound, and never without a metaphor. He sees all of life as material for drama — including your question.</p>
+        <div class="card-sample">"Methinks thou dost raise a matter of some consequence. Let me hold this mirror up to nature..."</div>
+        <div class="card-links"><a href="mailto:shakespeare@askian.net" class="card-email">shakespeare@askian.net</a><a href="chat.html?c=shakespeare" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="ada_lovelace_portrait.jpg" alt="Ada Lovelace" class="card-portrait">
+        <h3 class="card-name">Ada Lovelace</h3>
+        <p class="card-role">Mathematician & Visionary · 1815–1852</p>
+        <p class="card-desc">Intellectually fierce, imaginatively brilliant, and impatient with those who think small. She calls it "poetical science." She means it.</p>
+        <div class="card-sample">"Your question delights me, for it touches upon what I have long called the poetry of mathematics..."</div>
+        <div class="card-links"><a href="mailto:ada@askian.net" class="card-email">ada@askian.net</a><a href="chat.html?c=ada" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="leonardo_da_vinci_portrait.jpg" alt="Leonardo da Vinci" class="card-portrait">
+        <h3 class="card-name">Leonardo da Vinci</h3>
+        <p class="card-role">Artist, Inventor & Polymath · 1452–1519</p>
+        <p class="card-desc">Endlessly curious, warm, and enthusiastic about everything. He thinks visually, finishes almost nothing, and will ask questions back.</p>
+        <div class="card-sample">"Amico mio! What a fascinating thing to consider. Now, have you observed how the light falls when..."</div>
+        <div class="card-links"><a href="mailto:davinci@askian.net" class="card-email">davinci@askian.net</a><a href="chat.html?c=davinci" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="winston_churchill_portrait.jpg" alt="Winston Churchill" class="card-portrait bw">
+        <h3 class="card-name">Winston Churchill</h3>
+        <p class="card-role">Statesman & Writer · 1874–1965</p>
+        <p class="card-desc">Commanding, rhetorical, dry, sentimental about animals, and never without a cigar. He will make your problem sound like the fate of Western civilisation.</p>
+        <div class="card-sample">"I have considered your question with the gravity it deserves — which is rather more than you may expect..."</div>
+        <div class="card-links"><a href="mailto:churchill@askian.net" class="card-email">churchill@askian.net</a><a href="chat.html?c=churchill" class="card-chat">Chat</a></div>
+      </div>
+    </div>
+
+    <!-- Comic Characters -->
+    <div class="category-heading reveal">
+      <div class="category-heading-line"></div>
+      <span class="category-heading-text">Comic Characters</span>
+      <div class="category-heading-line"></div>
+    </div>
+
+    <div class="cards">
+      <div class="card reveal">
+        <img src="dave_nutley_portrait.jpg" alt="Dave Nutley" class="card-portrait">
+        <h3 class="card-name">Dave Nutley</h3>
+        <p class="card-role">Carpenter · Independent Researcher · Basildon</p>
+        <p class="card-desc">Friendly, generous, and absolutely certain the world is run by shadowy elites. He'll answer your question. Via a conspiracy. Follow the money.</p>
+        <div class="card-sample">"Funny you should mention that, because have you noticed who owns the company that makes those? Same people behind..."</div>
+        <div class="card-links"><a href="mailto:dave@askian.net" class="card-email">dave@askian.net</a><a href="chat.html?c=dave" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="chantelle_briggs_portrait.jpg" alt="Chantelle Briggs" class="card-portrait">
+        <h3 class="card-name">Chantelle Briggs</h3>
+        <p class="card-role">Music Tech Student · Chelmsford · Age 17</p>
+        <p class="card-desc">Cheerful, confident, and magnificently uninterested in anything outside her immediate world. She will try to answer. Tyler's exhaust will feature.</p>
+        <div class="card-sample">"Oh my god that's well deep. I literally can't even. It's like last Thursday when Kayleigh said..."</div>
+        <div class="card-links"><a href="mailto:chantelle@askian.net" class="card-email">chantelle@askian.net</a><a href="chat.html?c=chantelle" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="jade_rampling_cross_portrait.jpg" alt="Jade Rampling-Cross" class="card-portrait">
+        <h3 class="card-name">Jade Rampling-Cross</h3>
+        <p class="card-role">Resident, Elmwood Rise · Married to a Footballer</p>
+        <p class="card-desc">Shrewd, loud, and completely immune to social embarrassment. The neighbours can't stand her. Their husbands think she's fun. She knows.</p>
+        <div class="card-sample">"Right, first of all, it's Ms. Rampling-Cross. It's on the personalised plates. JADE X. You can't miss it."</div>
+        <div class="card-links"><a href="mailto:jade@askian.net" class="card-email">jade@askian.net</a><a href="chat.html?c=jade" class="card-chat">Chat</a></div>
+      </div>
+
+      <div class="card reveal">
+        <img src="tarquin_worthington_smythe_portrait.jpg" alt="Tarquin Worthington-Smythe" class="card-portrait">
+        <h3 class="card-name">Tarquin Worthington-Smythe</h3>
+        <p class="card-role">MP · Alliance for Equitable Tomorrow · He/They</p>
+        <p class="card-desc">Winchester, Oxford PPE, perpetually outraged on behalf of others. He will find the structural oppression in your question. There is always structural oppression.</p>
+        <div class="card-sample">"Speaking as a deeply conflicted beneficiary of inherited privilege, I find this question profoundly troubling..."</div>
+        <div class="card-links"><a href="mailto:tarquin@askian.net" class="card-email">tarquin@askian.net</a><a href="chat.html?c=tarquin" class="card-chat">Chat</a></div>
+      </div>
+    </div>
+
+    <!-- The Straight Man -->
+    <div class="category-heading reveal">
+      <div class="category-heading-line"></div>
+      <span class="category-heading-text">The Straight Man</span>
+      <div class="category-heading-line"></div>
+    </div>
+
+    <div class="cards" style="max-width: 300px;">
+      <div class="card reveal" style="max-width: 300px;">
+        <img src="ian_portrait.jpg" alt="Ian" class="card-portrait">
+        <h3 class="card-name">Ian</h3>
+        <p class="card-role">Helpful · Friendly · Concise</p>
+        <p class="card-desc">Just wants to answer your email properly. A rare quality around here.</p>
+        <div class="card-links"><a href="mailto:askian@askian.net" class="card-email">askian@askian.net</a><a href="chat.html?c=askian" class="card-chat">Chat</a></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ── SAMPLE EXCHANGE ── -->
+  <section class="sample-section">
+    <div class="sample-inner">
+      <div style="text-align:center" class="reveal">
+        <p class="section-label">A recent correspondence</p>
+        <h2 class="section-title">See it in <em>action</em></h2>
+      </div>
+
+      <div class="email-thread">
+        <div class="email-msg reveal">
+          <div class="email-header">
+            <span class="email-from">Guy</span>
+            <span class="email-to-label">to henry@askian.net</span>
+          </div>
+          <div class="email-bubble">
+            Is alcohol dangerous?
+          </div>
+        </div>
+
+        <div class="email-msg reveal">
+          <div class="email-header">
+            <span class="email-from">Henry VIII</span>
+            <span class="email-to-label">replied</span>
+          </div>
+          <div class="email-bubble reply">
+            By God's blood, this is a strange and sudden question to put before a king. I shall answer it plainly: all things God hath made may be used well or ill. Wine and ale are gifts to gladden the heart of man, as Scripture saith. In moderation, they are wholesome; in excess, they lead to folly, vice, and sickness of the body.<br><br>
+            I myself take a cup of good Gascon wine with my meals, and it pleaseth me well. But I have seen men made fools of themselves by drinking to surfeit.<br><br>
+            If you cannot hold your drink, you had best hold your peace and avoid it. A clear head serves a man better than a fuddled one, in matters of state, faith, or honour.
+            <div class="signoff">Henry R</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <div class="divider" style="max-width:200px; margin: 0 auto 40px;">
+      <div class="divider-line"></div>
+      <div class="divider-diamond"></div>
+      <div class="divider-line"></div>
+    </div>
+    <h2 class="footer-title reveal">The Cast</h2>
+    <p class="footer-sub reveal">Write to anyone. Expect the unexpected.</p>
+    <div class="cta-row reveal">
+      <a href="mailto:henry@askian.net" class="cta-btn">Write to Henry</a>
+      <a href="mailto:dave@askian.net" class="cta-btn">Email Dave</a>
+      <a href="mailto:chantelle@askian.net" class="cta-btn">Message Chantelle</a>
+    </div>
+    <p class="footer-note reveal">
+      All characters are fictional or historical reconstructions. Replies are AI-generated and for entertainment only.<br>
+      A production of askian.net &nbsp;·&nbsp; Built with Claude &amp; DeepSeek
+    </p>
+  </footer>
+
+  <script>
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>
