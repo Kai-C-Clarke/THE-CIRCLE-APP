@@ -543,15 +543,18 @@ def get_email_body(msg):
 
 def get_persona_from_recipient(msg):
     """Determine which persona to use based on the To address."""
-    to_addr = msg.get("To", "").lower()
-    # Also check Delivered-To and X-Original-To for alias routing
-    delivered_to = msg.get("Delivered-To", "").lower()
-    x_original = msg.get("X-Original-To", "").lower()
-
-    for addr in [to_addr, delivered_to, x_original]:
-        local_part = addr.split("@")[0] if "@" in addr else ""
-        if local_part in PERSONAS:
-            return local_part, PERSONAS[local_part]
+    # Try multiple headers in order of preference
+    headers_to_check = ["To", "Delivered-To", "X-Original-To"]
+    
+    for header in headers_to_check:
+        header_value = msg.get(header, "")
+        if header_value:
+            # Use parseaddr to properly extract email from "Name <email>" format
+            _, email_addr = parseaddr(header_value)
+            if email_addr and "@" in email_addr:
+                local_part = email_addr.split("@")[0].lower()
+                if local_part in PERSONAS:
+                    return local_part, PERSONAS[local_part]
 
     # Default to Ian
     return "askian", PERSONAS["askian"]
