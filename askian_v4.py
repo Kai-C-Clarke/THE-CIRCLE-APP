@@ -44,8 +44,9 @@ EMAIL_PASSWORD = os.environ.get("ASKIAN_PASSWORD", "rStNTTs99gVj")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-44c5721e2b254942b2c208e052a3fc57")
 
 # Where to store state (replied message IDs, rate limit counters)
-STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "askian_state.json")
-LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "askian_log.txt")
+# Use persistent disk so state survives redeploys
+STATE_FILE = "/mnt/data/askian_state.json"
+LOG_FILE = "/mnt/data/askian_log.txt"
 
 # Safety limits
 MAX_REPLIES_PER_HOUR = 10          # Global rate limit
