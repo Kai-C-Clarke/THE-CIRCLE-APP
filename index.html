@@ -793,143 +793,28 @@
 </body>
 </html>
 
-<!-- Compose Modal -->
-<div id="compose-modal" style="
-  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85);
-  z-index:10000; justify-content:center; align-items:center; padding:20px;">
-  <div style="
-    background:#1a0a05; border:1px solid #c9a84c; max-width:480px; width:100%;
-    padding:30px; position:relative; font-family:'Jost',sans-serif;">
-    <button onclick="closeCompose()" style="
-      position:absolute; top:12px; right:16px; background:none; border:none;
-      color:#c9a84c; font-size:1.4rem; cursor:pointer; line-height:1;">✕</button>
-    <div style="color:#c9a84c; font-size:0.7rem; letter-spacing:0.2em; text-transform:uppercase; margin-bottom:6px;">Composing to</div>
-    <div id="compose-to-display" style="color:#f5e6c8; font-size:1rem; margin-bottom:20px; font-style:italic;"></div>
-    <div style="margin-bottom:14px;">
-      <label style="color:#c9a84c; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; display:block; margin-bottom:4px;">Your name</label>
-      <input id="compose-name" type="text" placeholder="Your name" style="
-        width:100%; background:#0d0503; border:1px solid #5a3e20; color:#f5e6c8;
-        padding:8px 10px; font-family:'Jost',sans-serif; font-size:0.9rem; box-sizing:border-box;">
-    </div>
-    <div style="margin-bottom:14px;">
-      <label style="color:#c9a84c; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; display:block; margin-bottom:4px;">Your email address</label>
-      <input id="compose-reply" type="email" placeholder="your@email.com" style="
-        width:100%; background:#0d0503; border:1px solid #5a3e20; color:#f5e6c8;
-        padding:8px 10px; font-family:'Jost',sans-serif; font-size:0.9rem; box-sizing:border-box;">
-    </div>
-    <div style="margin-bottom:14px;">
-      <label style="color:#c9a84c; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; display:block; margin-bottom:4px;">Subject</label>
-      <input id="compose-subject" type="text" placeholder="What would you like to say?" style="
-        width:100%; background:#0d0503; border:1px solid #5a3e20; color:#f5e6c8;
-        padding:8px 10px; font-family:'Jost',sans-serif; font-size:0.9rem; box-sizing:border-box;">
-    </div>
-    <div style="margin-bottom:20px;">
-      <label style="color:#c9a84c; font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; display:block; margin-bottom:4px;">Message</label>
-      <textarea id="compose-body" rows="5" placeholder="Write your message..." style="
-        width:100%; background:#0d0503; border:1px solid #5a3e20; color:#f5e6c8;
-        padding:8px 10px; font-family:'Jost',sans-serif; font-size:0.9rem;
-        box-sizing:border-box; resize:vertical;"></textarea>
-    </div>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <button onclick="sendCompose()" id="compose-send-btn" style="
-        background:#c9a84c; color:#1a0a05; border:none; padding:10px 28px;
-        font-family:'Jost',sans-serif; font-size:0.8rem; font-weight:600;
-        letter-spacing:0.15em; text-transform:uppercase; cursor:pointer;">SEND</button>
-      <button onclick="closeCompose()" style="
-        background:none; border:1px solid #5a3e20; color:#c9a84c; padding:10px 20px;
-        font-family:'Jost',sans-serif; font-size:0.8rem; cursor:pointer;">Cancel</button>
-      <span id="compose-status" style="color:#c9a84c; font-size:0.8rem; font-style:italic;"></span>
-    </div>
-  </div>
-</div>
+<div id="email-toast" style="
+  position:fixed; bottom:30px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:#1a1a1a; color:#c9a84c; padding:10px 24px;
+  font-family:'Oswald',sans-serif; font-size:0.85rem; letter-spacing:0.1em;
+  opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999;
+  border:1px solid #c9a84c;">ADDRESS COPIED</div>
 
 <script>
-var composeEmail = '';
-
 function handleEmail(el) {
   const email = el.getAttribute('data-email');
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (isMobile) {
-    window.location.href = 'mailto:' + email;
-    return;
-  }
-  composeEmail = email;
-  document.getElementById('compose-to-display').textContent = email;
-  document.getElementById('compose-name').value = '';
-  document.getElementById('compose-reply').value = '';
-  document.getElementById('compose-subject').value = '';
-  document.getElementById('compose-body').value = '';
-  document.getElementById('compose-status').textContent = '';
-  document.getElementById('compose-send-btn').textContent = 'SEND';
-  document.getElementById('compose-send-btn').disabled = false;
-  document.getElementById('compose-modal').style.display = 'flex';
-  document.getElementById('compose-name').focus();
-}
-
-function closeCompose() {
-  document.getElementById('compose-modal').style.display = 'none';
-}
-
-async function sendCompose() {
-  const name = document.getElementById('compose-name').value.trim();
-  const reply = document.getElementById('compose-reply').value.trim();
-  const subject = document.getElementById('compose-subject').value.trim();
-  const body = document.getElementById('compose-body').value.trim();
-  const status = document.getElementById('compose-status');
-  const btn = document.getElementById('compose-send-btn');
-
-  if (!name || !reply || !subject || !body) {
-    status.textContent = 'Please fill in all fields.';
-    status.style.color = '#e07050';
-    return;
-  }
-  if (!reply.includes('@')) {
-    status.textContent = 'Please enter a valid email address.';
-    status.style.color = '#e07050';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'SENDING...';
-  status.textContent = '';
-
-  try {
-    const res = await fetch('/.netlify/functions/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: composeEmail,
-        replyTo: reply,
-        fromName: name,
-        subject: subject,
-        body: body
-      })
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      status.style.color = '#c9a84c';
-      status.textContent = 'Sent! Expect a reply shortly.';
-      btn.textContent = 'SENT ✓';
-      setTimeout(closeCompose, 2500);
-    } else {
-      status.style.color = '#e07050';
-      status.textContent = 'Error: ' + (data.error || 'Unknown error');
-      btn.disabled = false;
-      btn.textContent = 'SEND';
-    }
-  } catch (err) {
-    status.style.color = '#e07050';
-    status.textContent = 'Failed to send. Please try again.';
-    btn.disabled = false;
-    btn.textContent = 'SEND';
+  window.location.href = 'mailto:' + email;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(email).then(() => {
+      const toast = document.getElementById('email-toast');
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(-50%) translateY(0)';
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(-50%) translateY(20px)';
+      }, 2500);
+    }).catch(() => {});
   }
 }
-
-// Close modal on backdrop click
-document.getElementById('compose-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeCompose();
-});
 </script>
 </body></html>
